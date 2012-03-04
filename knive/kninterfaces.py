@@ -1,5 +1,4 @@
-import logging
-from zope.interface import Interface, implements, Attribute
+from zope.interface import Interface, Attribute
 
 class IKNOutlet(Interface):
     """IKNOutlets receive data from IKNInlets and do something with it."""
