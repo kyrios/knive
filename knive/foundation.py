@@ -53,7 +53,7 @@ class KNDistributor(object):
         If not already done this service will be set as inlet on the specified outlet."""
         if IKNOutlet.implementedBy(outlet.__class__):
             if outlet.inlet != self:
-                outlet.inlet.setInlet(self)
+                outlet.setInlet(self)
             if outlet not in self.outlets:
                 self.outlets.append(outlet)
         else:
@@ -194,6 +194,11 @@ class KNDistributor(object):
 
     def dataReceived(self,data):
         """The inlet Chain writes data to this method. Overwrite it and do something meaningfull with it"""
-        pass
+        raise(NotImplemented)
+
+    def sendDataToAllOutlets(self,data):
+        """Send data to our outlets"""
+        for outlet in self.outlets:
+            outlet.dataReceived(data)
 
 
