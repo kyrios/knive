@@ -5,7 +5,7 @@
 #favourite_color = option('red', 'green', 'blue', default="red")
 
 [paths]
-ffmpegPath = string(default=/usr/bin/ffmpeg)
+ffmpegbin = string(default=/usr/bin/ffmpeg)
 
 [logging]
 logfile = string(default=./knive.log)
