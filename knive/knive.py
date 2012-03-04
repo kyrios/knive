@@ -28,7 +28,7 @@ class Knive(service.MultiService):
 
     def startService(self):
         """Start the service"""
-        service.MultiService.startService()
+        service.MultiService.startService(self)
         for channel in self.channels:
             channel.start()
 
@@ -69,12 +69,11 @@ class Knive(service.MultiService):
                         logging.exception(err)
                         sys.exit(1)
 
-                    sys.exit(1)
-                    for quality in knive.config[outletsectionname]:
-                        if isinstance(knive.config[outletsectionname][quality],configobj.Section):
-                            httplivestream.addQuality(name=quality,config=knive.config[outletsectionname][quality])
+                    for qualityname in outletConfig.sections:
+                        qualityConfig = outletConfig[qualityname]
+                        httplivestream.createQuality(qualityname,qualityConfig,ffmpegbin=self.config['paths']['ffmpegbin'])
 
-                    #show0.addOutlet(httplivestream)
+                    channel.addOutlet(httplivestream)
 
                 elif outletConfig['type'] == 'StreamArchiver':
                     
