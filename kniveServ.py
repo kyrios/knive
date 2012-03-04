@@ -89,4 +89,5 @@ knive.startService()
 # reactor.callLater(1,show0.startEpisode,episode)
 
 
+reactor.callLater(10,reactor.stop)
 reactor.run()
