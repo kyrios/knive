@@ -1,0 +1,5 @@
+Requirements:
+
+Python Libraries:
+* pycrpto (For manhole service)
+* pyasn1 (For manhole service)
