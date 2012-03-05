@@ -94,7 +94,7 @@ class KNDistributor(object):
 
         if not self.running:
             self.log.debug("Will start")
-            self.willStart()
+            self._willStart()
 
             # Start the outlets
             def _outletStarted():
@@ -106,14 +106,14 @@ class KNDistributor(object):
             def _allOutletsStarted():
                 self.running = True
                 self.log.debug("Did start")
-                self.didStart()
+                self._didStart()
 
                 self.log.debug("Will notify %s that I started" % self.inlet)
-                self.inlet.outletStarted(self)
+                self.inlet._outletStarted(self)
                 defStarted.callback()
 
                 self.log.debug("Started and notified %s" % self.inlet)
-                self.didStartAndNotifiedInlet()
+                self._didStartAndNotifiedInlet()
 
 
             for outlet in self.outlets:
@@ -125,23 +125,23 @@ class KNDistributor(object):
 
         return defStarted
 
-    def willStart(self):
+    def _willStart(self):
         """Stuff to be done before outlets gets the start command"""
         pass
 
-    def didStart(self):
+    def _didStart(self):
         """Stuff to be done after all outlets have started but before the inlet is notified"""
         pass
 
-    def didStartAndNotifiedInlet(self):
+    def _didStartAndNotifiedInlet(self):
         """Stuff to be done after all outlets have started and the inlet was notified"""
         pass
 
-    def outletStarted(self,outlet):
+    def _outletStarted(self,outlet):
         """called by our outlets after they started"""
         pass
 
-    def startFailed(self,outlet):
+    def _startFailed(self,outlet):
         pass
 
     def startRecording(self, autoStop=None):
@@ -175,30 +175,30 @@ class KNDistributor(object):
     def stop(self):
         """Stop the module and all outlets. Notify the inlet when everything has stopped. Do not override this."""
         self.log.debug("Will stop")
-        self.willStop()
+        self._willStop()
 
         self.log.debug("Did stop. Inlet %s not notified yet" % self.inlet)
-        self.didStop()
+        self._didStop()
 
         self.log.debug("Did stop. Will notify inlet %s" % self.inlet)
-        self.inlet.outletStopped(self)
+        self.inlet._outletStopped(self)
 
         self.log.debug("Did stop. Inlet %s notified" % self.inlet)
-        self.didStopAndNotifiedInlet()
+        self._didStopAndNotifiedInlet()
 
-    def willStop(self):
+    def _willStop(self):
         """Stuff to be done before outlets get the stop command"""
         pass
 
-    def didStop(self):
+    def _didStop(self):
         """Stuff to be done after outlets stopped but before the inlet is notified."""
         pass
 
-    def didStopAndNotifiedInlet(self):
+    def _didStopAndNotifiedInlet(self):
         """Stuff to be done after outlets stopped and after the inlet was notified"""
         pass
 
-    def outletStopped(self,outlet):
+    def _outletStopped(self,outlet):
         """The outlet notified us that it has stopped"""
         pass
 

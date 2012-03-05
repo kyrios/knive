@@ -82,11 +82,11 @@ class TCPTSServer(KNDistributor):
         self.log.err('Connection failed. Can not continue.')
         reactor.stop()
 
-    def didStart(self):
+    def _didStart(self):
         """Stuff to be done after all outlets have started but before the inlet is notified"""
         self.connection.startService()
 
-    def willStop(self):
+    def _willStop(self):
         """Stuff to be done before outlets get the stop command"""
         self.connection.stopService()
 

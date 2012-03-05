@@ -61,7 +61,7 @@ class FFMpeg(KNDistributor):
         self.log.debug("FFMpegcommand: %s %s" % (self.ffmpegbin," ".join(self.fargs)))
         self.cmdline = "%s %s" % (self.ffmpegbin," ".join(self.fargs))
         
-    def didStart(self):
+    def _didStart(self):
         """Stuff to be done after all outlets have started but before the inlet is notified"""
         self.log.debug('Spawning new FFMpeg process')
         reactor.spawnProcess(self.protocol,self.ffmpegbin,self.fargs)
