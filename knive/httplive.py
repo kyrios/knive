@@ -7,8 +7,14 @@
 
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 import os
+import tempfile
+import shutil
+
+from twisted.internet       import reactor
+
 from foundation import KNDistributor
 from ffmpeg     import FFMpeg
+from exceptions import *
 
 class HTTPLiveStream(KNDistributor):
     """
@@ -174,44 +180,102 @@ class HTTPLiveVariantStream(KNDistributor):
                 raise Exception("Directory does not exist %s" % destdir)
 
 
-# class HTTPLiveSegmenter(KNProcess):
-#     """Cuts mpeg-ts streams in chunks and creates index files."""
-#     def __init__(self,inlet,tempdir=None):
-#         super(HTTPLiveSegmenter, self).__init__()
-#         self.protocol = SegmenterProtocol()
-#         inlet.addOutlet(inlet)
-#         self.destdir = inlet
-#         self.tempdir = tempdir
-#         if self.tempdir is None:
-#             self.tempdir = tempfile.gettempdir()
-#         self.m3u8 = None 
-#         self.httpStream = None
-            
+class HTTPLiveSegmenter(KNDistributor):
+    """Cuts mpeg-ts streams in chunks and creates index files."""
+    def __init__(self,name="Unknown segmenter",segmenterbin='bin/segmenter',destdir=None,tempdir=None):
+        """
+        Kwargs:
+            name: Name of this segmenter.
+            segmenterbin: Path to the segmenter binary
+            destdir: The location where ready files will be moved to.
+            tempdir: Location where tempfiles will be written. If None, let python decide.
+        """
+
+        super(HTTPLiveSegmenter, self).__init__(name=name)
+
+        self.name = name
+        """Name of this segmenter"""
+
+        self.segmenterbin = segmenterbin
+        """The segmenter binary to be used (path)"""
+
+        self.m3u8 = None
+        """The :class:`HTTPLiveStreamM3U8` object associated with this segmenter."""
+
+        self.httpStream = None
+        """The :class:`HTTPLiveStream` this segmenter belongs to. This is determined automatially."""
+
+        
+
+        self._destinationDirectory = destdir
+
+        if tempdir is None:
+            self._tempdir = tempfile.gettempdir()
+        else:
+            self._tempdir = tempdir
+
+        self._protocol = SegmenterProtocol()
+        self._protocol.factory = self
+
+
+        
+    def _didStart(self):
+        """All preparations done. Start the process"""
+        self.httpStream = self.findObjectInInletChainOfClass(HTTPLiveStream)
+        if not self.httpStream:
+            raise(CanNotStartError("No HTTPLiveStream object found in inlet chain."))
+        self._protocol.setName("segmenterProtocol")
+        self.m3u8 = HTTPLiveStreamM3U8(self._destinationDirectory)
+        self.m3u8.setParent(self)
+        args = ["live_segmenter","10",self._tempdir,self.parent.parent.name,self.parent.parent.name]
+
+        self.log.debug("Spawning Process: %s" % " ".join(args))
+        reactor.spawnProcess(self.protocol,self.parent.parent.config.get('Paths','segmenter'),args)
+
+    def dataReceived(self,data):
+        """Data received from our inlet. Pipe this data to the ffmpeg process"""
+        if not self.running:
+            raise(Exception("Process not running"))
+        else:
+            self.protocol.writeData(data)
     
-#     def startProcess(self):
-#         """Starting the segmenter"""
-#         self.httpStream = self.findParentOfType(HTTPLiveStream)
-#         self.protocol.setName("segmenterProtocol")
-#         self.protocol.setParent(self)
-#         self.m3u8 = HTTPLiveStreamM3U8(self.destdir)
-#         self.m3u8.setName("M3U8")
-#         self.m3u8.setParent(self)
+    def segmentReady(self,startindex,lastindex,end,encodingprofile,duration):
+        """A segment is ready for transfer"""
+        #umts-00000001.ts
+        duration = float(duration)
         
-#         args = ["live_segmenter","10",self.tempdir,self.parent.parent.name,self.parent.parent.name]
-#         self.logger.info("Spawning Process: %s" % " ".join(args))
-#         reactor.spawnProcess(self.protocol,self.parent.parent.config.get('Paths','segmenter'),args)
-    
-#     def segmentReady(self,startindex,lastindex,end,encodingprofile,duration):
-#         """A segment is ready for transfer"""
-#         #umts-00000001.ts
-#         duration = float(duration)
+        self.httpStream.setLastIndex(int(lastindex))
+        filename = "%s-%08d.ts" % (encodingprofile,int(lastindex))
+        sourcefile = "%s%s%s" % (self.tempdir,os.path.sep,filename)
+        destfile = "%s%s%s" % (self.destdir,os.path.sep,self.m3u8.addSegment(duration))
+        self.logger.debug("Copying file %s to %s" % (filename,destfile))
         
-#         self.httpStream.setLastIndex(int(lastindex))
-#         filename = "%s-%08d.ts" % (encodingprofile,int(lastindex))
-#         sourcefile = "%s%s%s" % (self.tempdir,os.path.sep,filename)
-#         destfile = "%s%s%s" % (self.destdir,os.path.sep,self.m3u8.addSegment(duration))
-#         self.logger.debug("Copying file %s to %s" % (filename,destfile))
+        #FIXME: This is propably a blocking call!
+        shutil.move(sourcefile,destfile)
+        self.m3u8.writeIndexFile()
+
+class SegmenterProtocol(object):
+    """docstring for SegmenterPro"""
+    def __init__(self, arg):
+        """
+
+        Args:
+        arg (str): Description
+
+
+        Kwargs:
+        arg (str): Description
+
+
+        """
+        super(SegmenterProtocol, self).__init__()
+        self.arg = arg
+
+
+class HTTPLiveStreamM3U8(object):
+    """docstring for HTTPLiveStreamM3U8"""
+    def __init__(self, arg):
+        super(HTTPLiveStreamM3U8, self).__init__()
+        self.arg = arg
         
-#         #FIXME: This is propably a blocking call!
-#         shutil.move(sourcefile,destfile)
-#         self.m3u8.writeIndexFile()
+      

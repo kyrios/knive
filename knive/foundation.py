@@ -54,6 +54,26 @@ class KNDistributor(object):
         else:
             self.__dict__[name] = value
 
+
+    def findObjectInInletChainOfClass(self,searchedClass):
+        """
+        tries to find an object in the chain of inlets which is a instance of searchedClass
+
+        recurse through the inlet chain and find the first matching object that is an instance of
+        the supplied class.
+
+        Args:
+            searchedClass: The class to look for
+
+        Returns: 
+            the first matching instance or None if None is found.
+        """
+        
+        if(isinstance(self.inlet,searchedClass)):
+            return self.inlet
+        else:
+            return self.inlet.findObjectInInletChainOfClass(searchedClass)
+
     def setInlet(self,inlet):
         """Set the inlet of this service. This can only be changed when the service is stopped. The inlet is the datasource or input.
         If not already done this service will be registered as outlet on the inlet."""
