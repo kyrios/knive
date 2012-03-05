@@ -42,7 +42,7 @@ consoleFormat = logging.Formatter('%(name)s:%(message)s')
 console.setFormatter(consoleFormat)
 console.setLevel(logging.DEBUG)
 rootLogger.addHandler(console)
-knive = makeKnive(os.path.abspath('knive.conf'))
+knive = makeKnive(os.path.abspath(os.path.dirname(__file__) + os.path.sep + 'knive.conf'))
 
 
 # Logfile output

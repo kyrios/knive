@@ -126,7 +126,7 @@ class Knive(service.MultiService):
         self.log.debug("Reading configuration from %s" % os.path.abspath(self.configFile))
         try:
             #print os.path.abspath('knive.conf.spec')
-            self.config = configobj.ConfigObj(self.configFile,file_error=True,configspec=os.path.abspath('knive/knive.conf.spec'))
+            self.config = configobj.ConfigObj(self.configFile,file_error=True,configspec=os.path.abspath(os.path.dirname(__file__) + os.path.sep + 'knive.conf.spec'))
         except (configobj.ConfigObjError, IOError), e:
             print 'Could not read "%s": %s' % (self.configFile, e)
             sys.exit(1)
