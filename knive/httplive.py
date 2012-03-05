@@ -10,21 +10,41 @@ import os
 from foundation import KNDistributor
 from ffmpeg     import FFMpeg
 
-
 class HTTPLiveStream(KNDistributor):
-    """A HTTPLiveStream accepts mpeg-ts streams (optionally) reencodes the data to (optionally) various qualities and cuts them in pieces.
-    The resul are small .ts files of several seconds duration. The HTTPLiveStream creates a playlist over the created .ts files.
+    """
+    A HTTPLiveStream accepts mpeg-ts streams (optionally) reencodes the data to (optionally) various qualities and cuts them in pieces.
+
+    The result of this are small .ts files of several seconds duration. The HTTPLiveStream creates a playlist over the created .ts files.
     The .ts segments and playlist are then typically stored on a webserver. Clients supporting HTTPLiveStream specification can then display
-    the stream. See http://tools.ietf.org/html/draft-pantos-http-live-streaming for full specification."""
+    the stream. See http://tools.ietf.org/html/draft-pantos-http-live-streaming for a full specification.
+
+    Extends :class:`KNDistributor`
+    """
     
     
     def __init__(self,name='Unknown',destdir=None,channel=None,publishURL=None,lastIndex=1):
         """
-        KWargs:
+        Kwargs:
         name: Name of the stream. (Set by channel.name if not set and channel available)
         destdir: The location of resulting output files
-        lastIndex is the index of the first index in a resulting new M3U8 file. It is where a
-        previous segmenter for the same stream left the work. For Livestreams
+        channel: The :mod:`channel` object this stream belongs to.
+        publishURL: The URL where the stream will be acessible to users.
+        lastIndex: The "biggest" index currently used by all variant streams. 
+        """
+
+        self.name = name
+        """name of the stream"""
+        if channel.name and name == 'Unknown':
+            self.name = channel.name
+        super(HTTPLiveStream, self).__init__(name=self.name) # Call this after we have a name.
+
+        self.publishURL = publishURL
+        """The URL the stream will be available at."""
+
+        self.lastIndex = lastIndex
+        """This is the index of the first index in a resulting new M3U8 file. 
+
+        It is where a previous segmenter for the same stream left the work. For Livestreams
         it's important to save it since the stream may be interrupted. Also, the same
         moment in time should result in the same index for every VariantStream to make
         adaptive Quality work. For the case that a VariantStream dies it shall restart with
@@ -32,36 +52,37 @@ class HTTPLiveStream(KNDistributor):
         each variantStream updates this value.
         """
 
-        self.name = name
-        if channel.name and name == 'Unknown':
-            self.name = channel.name
-        super(HTTPLiveStream, self).__init__(name=self.name) # Call this after we have a name.
+
+        self.qualities = []
+        """List of available :class:`HTTPLiveVariantStream` objects."""
+
 
         self._destdir = None
         if not destdir:
             raise Exception('destdir can not be none.')
         self.setDestdir(destdir)
 
-        self.publishURL = publishURL
-        self._lastIndex = lastIndex
-        self.qualities = []
-
     def createQuality(self,name,config,ffmpegbin=None):
-        """Create a new HTTPLiveVariantStream object and add it to self.qualities.
-        Args:
-        name: Give this Quality a name. This will be used in paths. So beware.
-        config: A valid configobject for setup of this quality.
+        """
+        Create a new :class:`HTTPLiveVariantStream` object and add it to self.qualities.
 
-        Return:
-        The created HTTPLiveVariantStream"""
+        Args:
+            name: Give this Quality a name.
+
+            config: A valid :class:`configobj.ConfigObj` for setup of this quality.
+
+        Returns:
+            The created :class:`HTTPLiveVariantStream`
+        """
+
         self.log.info('Creating new HTTPLiveVariantStream: %s' % name)
-        httpliveStreamvariant = HTTPLiveVariantStream('%s/%s' % (self.name,name),config,ffmpegbin=ffmpegbin)
+        httpliveStreamvariant = HTTPLiveVariantStream('%s/%s' % (self.name,name),config,ffmpegbin=ffmpegbin,destdir=self._destdir + os.path.sep + name)
         self.addQuality(httpliveStreamvariant)
         return httpliveStreamvariant
 
         
     def addQuality(self,quality):
-        """Add the HTTPLiveVariantStream object 'quality' to self.qualities"""
+        """Add a :class:`HTTPLiveVariantStream` object to self.qualities"""
         # TODO: Fix/Check behaviour when already running. What happens?
         if quality not in self.qualities:
             self.qualities.append(quality)
@@ -96,37 +117,52 @@ class HTTPLiveVariantStream(KNDistributor):
     """Encode an input mpegts stream to the desired quality and segment the stream to chunks"""
     
     def __init__(self,name,encoderArguments,destdir=None,ffmpegbin=None):
-        """Set up a new HTTP Live Stream Variant
+        """
         Args:
         name: Name of this quality (Used in path names)
-        encoderArguments: ConfigObject for FFMpeg options.
-        destdir: The location where files are saved. If None it's derived from the paret HTTPLiveStream and 'name' of the variant (recommended)"""
+        encoderArguments: :class:`configobj.ConfigObj` with valid ffmpeg options. This will be passed to a new :class:`FFMpeg` object.
+        destdir: The location where files will be saved.
+        ffmpegbin: Path to ffmpeg binary.
+        """
         super(HTTPLiveVariantStream,self).__init__(name=name)
+
         self.name = name
-        self._encoder = None
-        self._segmenter = None
+        """Name of this variant"""
+
+        self.encoder = None
+        """The :class:`FFMpeg` object used for encoding"""
+
+        self.segmenter = None
+        """The :class:`HTTPLiveSegmenter` object used for segmenting"""
+
+        self.destinationDirectory = None
+        self.setDestdir(destdir)
         # Set up the encoder
         if ffmpegbin:
-            self._encoder = FFMpeg(ffmpegbin=ffmpegbin,encoderArguments=encoderArguments)
+            self.encoder = FFMpeg(ffmpegbin=ffmpegbin,encoderArguments=encoderArguments)
         else:
-            self._encoder = FFMpeg(encoderArguments=encoderArguments)
+            self.encoder = FFMpeg(encoderArguments=encoderArguments)
 
 
 
-        # self._segmenter = HTTPLiveSegmenter()
+        # self.segmenter = HTTPLiveSegmenter()
         # Hook everything up
-        self.addOutlet(self._encoder)
+        self.addOutlet(self.encoder)
         # self._encoder.addOutlet(self._segmenter)
 
         
     def setDestdir(self,destdir,createDir=False):
-        """docstring for setDestdir"""
-        if destdir is None:
-            return #TODO: Bug somewhere here... X_X
+        """Set the location where files will be saved to destdir.
+
+        Args:
+            createDir: (bool) Create the directory if it doesn't exist already. Else throws an exception.
+        """
+
+        self.log.debug("Settings destinationDirectory to %s" % destdir)
         destdir = os.path.abspath(destdir)
         if os.path.exists(destdir):
-            super(HTTPLiveVariantStream,self).__setattr__('destinationDirectory',destdir)
-            self.logger.debug("Will create files in '%s'" % self.destinationDirectory)
+            self.destinationDirectory = destdir
+            self.log.debug("Will create files in '%s'" % self.destinationDirectory)
         else:
             if(createDir):
                 try:
