@@ -76,3 +76,8 @@ class Channel(KNDistributor):
                 if IKNRecorder.providedBy(outlet):
                     outlet.stopRecording()
             self.episodes[-1].stop()
+
+
+    def getMetadataAsJson(self):
+        pass
+
