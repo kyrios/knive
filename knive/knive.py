@@ -34,10 +34,21 @@ class Knive(service.MultiService):
         self.channels = []
         """List of available channels."""
 
+    def printOutlets(self,object,t=2,r=1):
+        if r>10:
+            Exception("Maximum recursion depth")
+            sys.exit(1)
+        for outlet in object.outlets:
+            print "%sOutlet: %s" % ("  "*t,outlet)
+            self.printOutlets(outlet,t+2,r=r+1)
+
     def startService(self):
         """Start the service"""
+        self.log.debug('Starting channels')
         service.MultiService.startService(self)
         for channel in self.channels:
+            self.log.info('Starting channel %s' % channel)
+            self.printOutlets(channel)
             channel.start()
 
     def stopService(self):
@@ -46,57 +57,61 @@ class Knive(service.MultiService):
         service.MultiService.stopService()
 
     def createChannelFromConfig(self,configObject):
-            channel = Channel(configObject['name'])
-            channel.slug = configObject['slug']            
-            channel.url = configObject['url']
+        channel = Channel(configObject['name'])
+        channel.slug = configObject['slug']            
+        channel.url = configObject['url']
 
-            
-            # ================
-            # = Inlet/Source =
-            # ================
+        
+        # ================
+        # = Inlet/Source =
+        # ================
 
-            if configObject['source']['type'] == 'kniveTCPSource':
-                channel.inlet = TCPTSServer(
-                                                    secret=configObject['source']['sharedSecret'],
-                                                    port=configObject['source']['listenPort']
-                                                )
-            else:
-                print "Unknown Inlet Type %s" % knive.config['stream']['inlet']
-                sys.exit(1)
+        if configObject['source']['type'] == 'kniveTCPSource':
+            channel.inlet = TCPTSServer(
+                                                secret=configObject['source']['sharedSecret'],
+                                                port=configObject['source']['listenPort']
+                                            )
+        else:
+            print "Unknown Inlet Type %s" % knive.config['stream']['inlet']
+            sys.exit(1)
 
-            # ===============
-            # = Set outlets =
-            # ===============
-            for outletsectionname in configObject['outlets']:
-                logging.debug('Setting up outlet: %s' % outletsectionname)
-                outletConfig = configObject['outlets'][outletsectionname]
-                if outletConfig['type'] == 'HTTPLive': 
-                    try:
-                        httplivestream = HTTPLiveStream(channel=channel,destdir=outletConfig['outputLocation'],publishURL=outletConfig['publishURL'])
-                    except Exception, err:
-                        logging.exception(err)
-                        sys.exit(1)
-
-                    for qualityname in outletConfig.sections:
-                        qualityConfig = outletConfig[qualityname]
-                        httplivestream.createQuality(qualityname,qualityConfig,ffmpegbin=self.config['paths']['ffmpegbin'])
-
+        # ===============
+        # = Set outlets =
+        # ===============
+        for outletsectionname in configObject['outlets']:
+            logging.debug('Setting up outlet: %s' % outletsectionname)
+            outletConfig = configObject['outlets'][outletsectionname]
+            if outletConfig['type'] == 'HTTPLive': 
+                try:
+                    httplivestream = HTTPLiveStream(channel=channel,destdir=outletConfig['outputLocation'],publishURL=outletConfig['publishURL'])
                     channel.addOutlet(httplivestream)
+                except Exception, err:
+                    logging.exception(err)
+                    sys.exit(1)
 
-                elif outletConfig['type'] == 'StreamArchiver':
-                    
-                    archiver = files.FileWriter(
-                                                        knive.config[outletsectionname]['outputdir'],
-                                                        suffix=knive.config[outletsectionname]['suffix'],
-                                                        keepFiles=knive.config[outletsectionname]['keepfiles'],
-                                                        filename=knive.config[outletsectionname]['filename']
-                                                    )
-                    show0.addOutlet(archiver)
-                elif outletConfig['type'] == 'MEncoder':
-                    mplayer = mplayer.Player(binary=knive.config[outletsectionname]['mplayerbin'])
-                    show0.addOutlet(mplayer)
-                else:
-                    self.log.error('Unknown outlet type %s' % outletsectionname)
+                for qualityname in outletConfig.sections:
+                    qualityConfig = outletConfig[qualityname]
+                    httplivestream.createQuality(qualityname,qualityConfig,ffmpegbin=self.config['paths']['ffmpegbin'])
+                
+                
+
+            elif outletConfig['type'] == 'StreamArchiver':
+                
+                archiver = files.FileWriter(
+                                                    knive.config[outletsectionname]['outputdir'],
+                                                    suffix=knive.config[outletsectionname]['suffix'],
+                                                    keepFiles=knive.config[outletsectionname]['keepfiles'],
+                                                    filename=knive.config[outletsectionname]['filename']
+                                                )
+                channel.addOutlet(archiver)
+            elif outletConfig['type'] == 'MEncoder':
+                mplayer = mplayer.Player(binary=knive.config[outletsectionname]['mplayerbin'])
+                channel.addOutlet(mplayer)
+            else:
+                self.log.error('Unknown outlet type %s' % outletsectionname)
+
+        self.addChannel(channel)
+
 
         
     def createChannel(self,channelName):
