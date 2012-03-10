@@ -37,7 +37,6 @@ class HTTPLiveStream(KNDistributor):
         publishURL: The URL where the stream will be acessible to users.
         lastIndex: The "biggest" index currently used by all variant streams. 
         """
-
         self.name = name
         """name of the stream"""
         if channel.name and name == 'Unknown':
@@ -59,7 +58,7 @@ class HTTPLiveStream(KNDistributor):
         """
 
 
-        self.qualities = []
+        self.outlets = []
         """List of available :class:`HTTPLiveVariantStream` objects."""
 
 
@@ -88,14 +87,13 @@ class HTTPLiveStream(KNDistributor):
 
         
     def addQuality(self,quality):
-        """Add a :class:`HTTPLiveVariantStream` object to self.qualities"""
+        """Add a :class:`HTTPLiveVariantStream` object to self."""
         # TODO: Fix/Check behaviour when already running. What happens?
-        if quality not in self.qualities:
-            self.qualities.append(quality)
+        self.addOutlet(quality)
 
     def removeQuality(self,quality):
         """Remove a quality from the stream. This is tricky (?) when the stream is running"""
-        raise(NotImplemented)
+        self.removeOutlet(quality)
         
    
     def setLastIndex(self,lastIndex):
