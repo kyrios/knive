@@ -10,6 +10,7 @@
 
 from kninterfaces import *
 from zope.interface import implements
+from twisted.internet.defer import Deferred
 import logging
       
 
@@ -27,32 +28,33 @@ class KNDistributor(object):
     """
     implements(IKNOutlet, IKNInlet)
 
-    def __init__(self, name=None, inlet=None, outlets=[]):
+    def __init__(self, name=None):
         super(KNDistributor, self).__init__()
         self.running = False
         self.name = name
-        self.inlet = inlet
-        self.outlets = outlets
-        
+        self.inlet = None
+        self.outlets = []
+
         self.log = logging.getLogger('[%s] %s' % (self.__class__.__name__,self.name))
+        self.log.debug("Init complete: %s" % (id(self.outlets)))
 
     def __str__(self):
         if self.name:
-            return self.name
+            return "<%s | %s>" % (self.name,self.__class__.__name__)
         else:
             return self.__instance__
 
-    # Dataflow .. Inlet and outlets
-    def __setattr__(self,name,value):
-        if name == 'inlet':
-            if self.running:
-                raise(Exception('Can only change inlet if not running.'))
-            elif value is not None:
-                self.__dict__[name] = IKNInlet(value)
-            else:
-                self.__dict__[name] = None
-        else:
-            self.__dict__[name] = value
+    # # Dataflow .. Inlet and outlets
+    # def __setattr__(self,name,value):
+    #     if name == 'inlet':
+    #         if self.running:
+    #             raise(Exception('Can only change inlet if not running.'))
+    #         elif value is not None:
+    #             self.__dict__[name] = IKNInlet(value)
+    #         else:
+    #             self.__dict__[name] = None
+    #     else:
+    #         self.__dict__[name] = value
 
 
     def findObjectInInletChainOfClass(self,searchedClass):
@@ -74,21 +76,34 @@ class KNDistributor(object):
         else:
             return self.inlet.findObjectInInletChainOfClass(searchedClass)
 
-    def setInlet(self,inlet):
+    def setInlet(self,inlet,recursiveCall=True):
         """Set the inlet of this service. This can only be changed when the service is stopped. The inlet is the datasource or input.
         If not already done this service will be registered as outlet on the inlet."""
+        self.log.debug('Setting Inlet to %s' % inlet)
         self.inlet = inlet
-        self.inlet.addOutlet(self)
+        if recursiveCall:
+            self.inlet.addOutlet(self)
 
 
     def addOutlet(self,outlet):
         """Outlets receive data from the service when the service is running. Outlets need to be of type IKNOutlet.
         If not already done this service will be set as inlet on the specified outlet."""
-        if IKNOutlet.implementedBy(outlet.__class__):
+        #
+        self.log.debug('Adding outlet %s to %s' % (outlet,self))
+        # print "Self.outlets:%s (%s)" % (self.outlets,id(self.outlets))
+        # print "Outlet.outlets: %s (%s)" % (outlet.outlets,id(outlet.outlets))
+        # return()
+        if IKNOutlet.providedBy(outlet):
             if outlet.inlet != self:
-                outlet.setInlet(self)
+                outlet.setInlet(self,recursiveCall=False)
             if outlet not in self.outlets:
-                self.outlets.append(outlet)
+                if outlet is not self:
+                    self.outlets.append(outlet)
+                    # print "Self.outlets:%s" % self.outlets
+                    # print "Outlet.outlets: %s" % outlet.outlets
+                else:
+                    raise(Exception("Can't be an outlet of myself"))                    
+
         else:
             raise(Exception('%s does not implement %s' % (outlet,IKNOutlet)))
 
@@ -106,20 +121,20 @@ class KNDistributor(object):
 
     def start(self):
         """Start the module and all outlets. Notify the inlet when everything is running. Do not override this."""
-        runningOutlets = 0
+        self.runningOutlets = 0
 
-        defStarted = internet.defer()
+        defStarted = Deferred()
         if not self.inlet:
             raise(ServiceRunningWithouInlet)
 
         if not self.running:
-            self.log.debug("Will start")
+
             self._willStart()
 
             # Start the outlets
-            def _outletStarted():
-                runningOutlets += 1
-                if runningOutlets >= len(self.outlets):
+            def _outletStarted(object):
+                self.runningOutlets += 1
+                if self.runningOutlets >= len(self.outlets):
                     #All outlets started
                     _allOutletsStarted()
 
@@ -130,15 +145,18 @@ class KNDistributor(object):
 
                 self.log.debug("Will notify %s that I started" % self.inlet)
                 self.inlet._outletStarted(self)
-                defStarted.callback()
+                defStarted.callback(self)
 
                 self.log.debug("Started and notified %s" % self.inlet)
                 self._didStartAndNotifiedInlet()
 
 
             for outlet in self.outlets:
+                self.log.debug('Starting outlet %s' % outlet)
                 d = outlet.start()
                 d.addCallback(_outletStarted)
+            if not len(self.outlets):
+                _allOutletsStarted()
         else:
             self.log.warning("%s is already running. Can not start" % self)
             d.errback('%s is already running. Can not start' % self)
