@@ -28,8 +28,8 @@
 from kninterfaces           import IKNStreamObject, IKNOutlet, IKNInlet
 from zope.interface         import implements
 from twisted.internet.defer import Deferred, maybeDeferred
-from exceptions             import ServiceRunningWithoutOutlets, ServiceRunningWithouInlet
 from twisted.internet       import protocol, reactor
+from exceptions             import ServiceRunningWithouInlet, ServiceRunningWithoutOutlets
 
 import logging
 
@@ -164,6 +164,11 @@ class KNInlet(KNStreamObject):
     def getStats():
         """Return a string with statistics about data flow (bits p second?)"""
         pass
+
+    def sendDataToAllOutlets(self,data):
+        """Send data to our outlets"""
+        for outlet in self.outlets:
+            outlet.dataReceived(data)
         
 
 class KNOutlet(KNStreamObject):
@@ -185,6 +190,7 @@ class KNOutlet(KNStreamObject):
     def start(self):
         startDefer = Deferred()
         def _started(target):
+            self.running = True
             startDefer.callback(self)
 
         d = maybeDeferred(self._start)
@@ -460,10 +466,20 @@ class KNProcessProtocol(protocol.ProcessProtocol):
 
     def processEnded(self, reason):
         if(reason.value.exitCode):
-            self.log.error("crashed")
+            self.log.error("crashed: %s" % reason)
             self.log.error("Process was: %s" % (self.factory.cmdline))
             self.log.error("Last message: %s" % (self._lastLogLine))
             if "processCrashed" in dir(self.factory):
                 self.factory.processCrashed()
         else:
-            self.log.info("ended.")  
+            self.log.info("ended.") 
+
+    def childConnectionLost(self,childFD):
+        self.log.error('Process closed: %s %s %s' % (childFD, self.factory.cmdline,self._lastLogLine))
+
+
+    def processExited(self,reason):
+        self.log.error('Process exited %s %s %s' % (reason, self.factory.cmdline,self._lastLogLine))
+
+
+
