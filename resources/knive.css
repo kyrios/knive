@@ -1,0 +1,10 @@
+.settings {
+    background-image: url( images/gears.gif ) !important;
+}
+
+.add {
+    background-image:url(images/add.gif) !important;
+}
+.warning {
+    background-image:url(images/warning.gif) !important;
+}
