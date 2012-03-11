@@ -229,6 +229,10 @@ class TCPTSServer(KNInlet):
         """Stuff to be done before outlets get the stop command"""
         self.connection.stopService()
 
+    def dataReceived(self,data):
+        """The protocol writes data to this method. Overwrite it and do something meaningfull with it"""
+        self.sendDataToAllOutlets(data)
+
 class TCPTSServerFactory(ServerFactory):
     """docstring for TCPTSServerFactory"""
     protocol = TCPTSServerProtocol
