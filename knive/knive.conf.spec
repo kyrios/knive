@@ -44,6 +44,7 @@ port=integer(min=1024,max=65000,default=8000)
             g=integer(default=None)
             b=string(default=None)
             vn=boolean(default=None)
+            f=string(default=mpegts)
 
     [[[source]]]
     type=option('kniveTCPSource', 'kniveFileSource', 'kniveIcecastSource')
