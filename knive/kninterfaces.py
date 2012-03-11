@@ -64,6 +64,9 @@ class IKNInlet(IKNStreamObject):
 
     def addOutlet(outlet):
         """Register an outlet with us. The outlet has to be of type IKNOutlet"""
+
+    def removeOutlet(outlet):
+        """Remove an outlet from us."""
         
     def getStats():
         """Return a string with statistics about data flow (bits p second?)"""
