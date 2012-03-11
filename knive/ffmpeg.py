@@ -38,6 +38,7 @@ class FFMpeg(KNDistributor):
         self.protocol.factory = self
         self.ffmpegbin = ffmpegbin
         self.encoderArguments = encoderArguments
+
         self._targetFPS = 25
         try:
             self._targetFPS = self.encoderArguments['r']
@@ -46,7 +47,9 @@ class FFMpeg(KNDistributor):
         
         self.fargs = ['ffmpeg','-y','-i','-']
         for key in self.encoderArguments.keys():
-            if type(self.encoderArguments[key]) == tuple: #Some ffmpeg argument may apear more than once. (-vpre)
+            if self.encoderArguments[key] is None:
+                continue # No None values
+            if type(self.encoderArguments[key]) == tuple or type(self.encoderArguments[key]) == list : #Some ffmpeg argument may apear more than once. (-vpre)
                 for val in self.encoderArguments[key]:
                     self.fargs.append("-%s" % key)
                     self.fargs.append("%s" % val)
@@ -88,9 +91,9 @@ class FFMpegProtocol(KNProcessProtocol):
     
     def errReceived(self, data):
         lines = str(data).splitlines()
-        #log.msg(data)
+        log.msg(data)
         for line in lines:
-            self.lastlogline = line
+            self._lastlogline = line
             if(self.__class__.REversion.match(line)):
                 log.msg(line)
             elif(self.__class__.REencodingStats.match(line)):
@@ -99,7 +102,7 @@ class FFMpegProtocol(KNProcessProtocol):
             elif(self.__class__.REencodingStatsAudio.match(line)):
                 self.stats = line
             else:
-                self.lastlogline = line
+                self._lastlogline = line
                 log.msg("%s" % (line))
 
     def updateStats(self,line):
