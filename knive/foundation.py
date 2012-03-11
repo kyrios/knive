@@ -1,20 +1,124 @@
+#
 # foundation.py
 # Copyright (c) 2012 Thorsten Philipp <kyrios@kyri0s.de>
 #
-# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the "Software"), to deal in the 
+# Software without restriction, including without limitation the rights to use, copy,
+# modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, 
+# and to permit persons to whom the Software is furnished to do so, subject to the
+# following conditions:
 #
-# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
 #
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+# PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+# HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION 
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+"""Base Classes in KN projects
 
+.. moduleauthor:: Thorsten Philipp <kyrios@kyri0s.de>
 
-from kninterfaces import *
-from zope.interface import implements
-from twisted.internet.defer import Deferred
+"""
+
+from kninterfaces           import IKNStreamObject, IKNOutlet, IKNInlet
+from zope.interface         import implements
+from twisted.internet.defer import Deferred, maybeDeferred
+from exceptions             import ServiceRunningWithoutOutlets, ServiceRunningWithouInlet
+from twisted.internet       import protocol, reactor
+
 import logging
-      
 
-class KNDistributor(object):
+
+class KNStreamObject(object):
+    """KNStreamObject is a superclass for all classes that produce or consume data.
+    The class handles basic starting and stopping of objects in the stream of data
+    as well as logging and other basic stuff."""
+    implements(IKNStreamObject)
+
+    def __init__(self,name=None):
+        super(KNStreamObject, self).__init__()
+        self.running = False
+        self.name = name
+        self.log = logging.getLogger('[%s] %s' % (self.__class__.__name__,self.name))
+
+    def start(self):
+        self._start()
+        self._didStart()
+        self.running = True
+
+    def stop(self):
+        self.running = False
+
+    def __str__(self):
+        if self.name:
+            return "<%s | %s>" % (self.name,self.__class__.__name__)
+        else:
+            return self.__instance__
+
+class KNOutlet(KNStreamObject):
+    """Implementation of :class:`IKNOutlet`"""
+    implements(IKNOutlet)
+    def __init__(self, name=None):
+        super(KNOutlet, self).__init__(name=name)
+        self.name = name
+        self.inlet = None
+
+    def setInlet(self,inlet,recursiveCall=True):
+        """Set the inlet of this service. This can only be changed when the service is stopped. The inlet is the datasource or input.
+        If not already done this service will be registered as outlet on the inlet."""
+        self.log.debug('Setting Inlet to %s' % inlet)
+        self.inlet = inlet
+        if recursiveCall:
+            self.inlet.addOutlet(self)
+
+    def start(self):
+        startDefer = Deferred()
+        def _started(target):
+            startDefer.callback(self)
+
+        d = maybeDeferred(self._start)
+        d.addCallback(_started)
+
+        return startDefer
+
+
+    def _start(self):
+        """Override this and actually start the service"""
+        raise(NotImplementedError)
+
+    def _findObjectInInletChainOfClass(self,searchedClass):
+        """
+        tries to find an object in the chain of inlets which is a instance of searchedClass
+
+        recurse through the inlet chain and find the first matching object that is an instance of
+        the supplied class.
+
+        Args:
+            searchedClass: The class to look for
+
+        Returns: 
+            the first matching instance or None if None is found.
+        """
+        self.log.debug('Searching %s' % searchedClass)
+        
+        if(isinstance(self.inlet,searchedClass)):
+            return self.inlet
+        else:
+            found = None
+            try:
+                found = self.inlet._findObjectInInletChainOfClass(searchedClass)
+            except AttributeError:
+                pass
+            return found
+
+
+
+class KNDistributor(KNOutlet):
     """Distribute Stream data from inlet to 1 or more outlets and handle
     errors in the chain of outlets.
 
@@ -29,52 +133,26 @@ class KNDistributor(object):
     implements(IKNOutlet, IKNInlet)
 
     def __init__(self, name=None):
-        super(KNDistributor, self).__init__()
-        self.running = False
-        self.name = name
+        super(KNDistributor, self).__init__(name=name)
+
         self.inlet = None
-        self.outlets = []
+        self.outlets = []        
 
-        self.log = logging.getLogger('[%s] %s' % (self.__class__.__name__,self.name))
-        self.log.debug("Init complete: %s" % (id(self.outlets)))
 
-    def __str__(self):
-        if self.name:
-            return "<%s | %s>" % (self.name,self.__class__.__name__)
+    # Dataflow .. Inlet and outlets
+    def __setattr__(self,name,value):
+        if name == 'inlet':
+            if self.running:
+                raise(Exception('Can only change inlet if not running.'))
+            elif value is not None:
+                self.__dict__[name] = IKNInlet(value)
+            else:
+                self.__dict__[name] = None
         else:
-            return self.__instance__
-
-    # # Dataflow .. Inlet and outlets
-    # def __setattr__(self,name,value):
-    #     if name == 'inlet':
-    #         if self.running:
-    #             raise(Exception('Can only change inlet if not running.'))
-    #         elif value is not None:
-    #             self.__dict__[name] = IKNInlet(value)
-    #         else:
-    #             self.__dict__[name] = None
-    #     else:
-    #         self.__dict__[name] = value
+            self.__dict__[name] = value
 
 
-    def findObjectInInletChainOfClass(self,searchedClass):
-        """
-        tries to find an object in the chain of inlets which is a instance of searchedClass
 
-        recurse through the inlet chain and find the first matching object that is an instance of
-        the supplied class.
-
-        Args:
-            searchedClass: The class to look for
-
-        Returns: 
-            the first matching instance or None if None is found.
-        """
-        
-        if(isinstance(self.inlet,searchedClass)):
-            return self.inlet
-        else:
-            return self.inlet.findObjectInInletChainOfClass(searchedClass)
 
     def setInlet(self,inlet,recursiveCall=True):
         """Set the inlet of this service. This can only be changed when the service is stopped. The inlet is the datasource or input.
@@ -127,6 +205,9 @@ class KNDistributor(object):
         if not self.inlet:
             raise(ServiceRunningWithouInlet)
 
+        if not len(self.outlets):
+            raise(ServiceRunningWithoutOutlets)
+
         if not self.running:
 
             self._willStart()
@@ -140,20 +221,16 @@ class KNDistributor(object):
 
             def _allOutletsStarted():
                 self.running = True
+                self._start()
                 self.log.debug("Did start")
-                self._didStart()
-
                 self.log.debug("Will notify %s that I started" % self.inlet)
-                self.inlet._outletStarted(self)
                 defStarted.callback(self)
-
                 self.log.debug("Started and notified %s" % self.inlet)
                 self._didStartAndNotifiedInlet()
 
-
             for outlet in self.outlets:
                 self.log.debug('Starting outlet %s' % outlet)
-                d = outlet.start()
+                d = maybeDeferred(outlet.start)
                 d.addCallback(_outletStarted)
             if not len(self.outlets):
                 _allOutletsStarted()
@@ -164,20 +241,20 @@ class KNDistributor(object):
         return defStarted
 
     def _willStart(self):
-        """Stuff to be done before outlets gets the start command"""
+        """Stuff to be done before outlets gets the start command (implemented for IKNInlet)"""
         pass
 
-    def _didStart(self):
-        """Stuff to be done after all outlets have started but before the inlet is notified"""
+    def _start(self):
+        """Stuff to be done after all outlets have started but before the inlet is notified (IKNInlet)"""
         pass
 
     def _didStartAndNotifiedInlet(self):
-        """Stuff to be done after all outlets have started and the inlet was notified"""
+        """Stuff to be done after all outlets have started and the inlet was notified (INKNInlet)"""
         pass
 
-    def _outletStarted(self,outlet):
-        """called by our outlets after they started"""
-        pass
+    def outletStarted(self,outlet):
+        """called by our outlets after they started (IKNInlet)"""
+        self._start()
 
     def _startFailed(self,outlet):
         pass
@@ -241,15 +318,45 @@ class KNDistributor(object):
         pass
 
 
-    # Data handling
-
-    def dataReceived(self,data):
-        """The inlet Chain writes data to this method. Overwrite it and do something meaningfull with it"""
-        raise(NotImplemented)
-
+    # IKNInlet - Produce data
     def sendDataToAllOutlets(self,data):
         """Send data to our outlets"""
         for outlet in self.outlets:
             outlet.dataReceived(data)
 
+    # INKOutlet - Consume data
 
+    def dataReceived(self,data):
+        """The inlet Chain writes data to this method. Overwrite it and do something meaningfull with it"""
+        self.sendDataToAllOutlets(data)
+
+
+class KNProcessProtocol(protocol.ProcessProtocol):
+    """Base class for all process Protocols"""
+    def __init__(self, name='Unknown'):
+        self.name = name
+        self.factory = None
+        self._lastLogLine = None
+        self.log = logging.getLogger('[%s]' % (self.__class__.__name__))
+
+    def errReceived(self,data):
+        """This is STDERR of the process. Everything gets written to the log. If this is usefull information override this method"""
+        lines = str(data).splitlines()
+        #log.msg(data)
+        for line in lines:
+            self._lastLogLine = line
+            self.log.warn("%s" % (line))
+
+    def writeData(self,data):
+        """Write data to STDIN"""
+        self.transport.write(data)
+
+    def processEnded(self, reason):
+        if(reason.value.exitCode):
+            self.log.error("crashed")
+            self.log.error("Process was: %s" % (self.factory.cmdline))
+            self.log.error("Last message: %s" % (self._lastLogLine))
+            if "processCrashed" in dir(self.factory):
+                self.factory.processCrashed()
+        else:
+            self.log.info("ended.")  

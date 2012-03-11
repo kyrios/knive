@@ -23,6 +23,8 @@
 import logging
 import logging.handlers
 import os
+import sys
+
 
 from knive.knive  import  makeKnive, KniveLogggingObserver
 # from knive  import streaming
@@ -38,7 +40,6 @@ from webknive   import web
 
 from twisted.internet           import reactor
 from twisted.conch.manhole_tap  import makeService as makeManholeService
-
 
 
 rootLogger = logging.getLogger('')
@@ -109,5 +110,5 @@ knive.startService()
 # reactor.callLater(1,show0.startEpisode,episode)
 
 
-reactor.callLater(10,reactor.stop)
+# reactor.callLater(10,reactor.stop)
 reactor.run()

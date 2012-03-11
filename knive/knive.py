@@ -16,6 +16,7 @@ from validate   import Validator
 from channel    import Channel
 from tcpts      import TCPTSServer
 from httplive   import HTTPLiveStream
+from kninterfaces   import IKNInlet
 
 from twisted.application        import service
 from twisted.python.log         import *
@@ -38,9 +39,10 @@ class Knive(service.MultiService):
         if r>10:
             Exception("Maximum recursion depth")
             sys.exit(1)
-        for outlet in object.outlets:
-            print "%sOutlet: %s" % ("  "*t,outlet)
-            self.printOutlets(outlet,t+2,r=r+1)
+        if IKNInlet.providedBy(object):
+            for outlet in object.outlets:
+                print "%sOutlet: %s" % ("  "*t,outlet)
+                self.printOutlets(outlet,t+2,r=r+1)
 
     def startService(self):
         """Start the service"""
@@ -57,7 +59,7 @@ class Knive(service.MultiService):
         service.MultiService.stopService()
 
     def createChannelFromConfig(self,configObject):
-        channel = Channel(configObject['name'])
+        channel = Channel(configObject['name'],self.config)
         channel.slug = configObject['slug']            
         channel.url = configObject['url']
 

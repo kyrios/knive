@@ -25,9 +25,12 @@
 
 """
 class ServiceRunningWithouInlet(Exception):
-    """Raised when a service is running without a valid inlet. This Service will not produce any output"""
+    """Raised when an IKNOutlet is started without a valid inlet. This IKNOutlet will not receive any data"""
 
 class CanNotStartError(Exception):
     """A service could not start sucesfuly."""
 
+class ServiceRunningWithoutOutlets(Exception):
+    """Raised when an IKNInlet is started without valid IKNOutlets to send data to."""
+        
         

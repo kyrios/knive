@@ -33,7 +33,7 @@ class Channel(KNDistributor):
     """A channel (also called Stream or Show) is the central element. For example a podcast project or a room at a conference is a channel.
     Think in broadcast channels. One channel can only stream one thing at a time."""
 
-    def __init__(self,name,slug=None,url=None):
+    def __init__(self,name,configObj,slug=None,url=None):
         """
         Args:
             name: The name of this channel. Example: "Bits und so"
@@ -44,6 +44,7 @@ class Channel(KNDistributor):
         """
 
         super(Channel, self).__init__(name=name)
+        self.config = configObj
         self.episodes = []
         """List of episodes/recordings"""
         self.slug = slug

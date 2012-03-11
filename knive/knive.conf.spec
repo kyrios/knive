@@ -14,6 +14,7 @@
 
 [paths]
 ffmpegbin = string(default=/usr/bin/ffmpeg)
+segmenterbin = string(default=/usr/local/bin/live_segmenter)
 
 [logging]
 logfile = string(default=./knive.log)

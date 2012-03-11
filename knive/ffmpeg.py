@@ -21,8 +21,8 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 import re
-from foundation import KNDistributor
-from twisted.internet       import protocol, reactor
+from foundation import KNDistributor, KNProcessProtocol
+from twisted.internet       import reactor
 from twisted.python         import log
 
 
@@ -61,7 +61,7 @@ class FFMpeg(KNDistributor):
         self.log.debug("FFMpegcommand: %s %s" % (self.ffmpegbin," ".join(self.fargs)))
         self.cmdline = "%s %s" % (self.ffmpegbin," ".join(self.fargs))
         
-    def _didStart(self):
+    def _start(self):
         """Stuff to be done after all outlets have started but before the inlet is notified"""
         self.log.debug('Spawning new FFMpeg process')
         reactor.spawnProcess(self.protocol,self.ffmpegbin,self.fargs)
@@ -71,12 +71,11 @@ class FFMpeg(KNDistributor):
         if not self.running:
             raise(Exception("Process not running"))
         else:
-            self.protocol.writeData(data)
+            self.protocol.writeData(data)    
 
 
-class FFMpegProtocol(protocol.ProcessProtocol):
+class FFMpegProtocol(KNProcessProtocol):
     """Parsing and communication with FFMpeg"""
-    factory = None
     fps = 0
     # Output matching
     REversion = re.compile('FFmpeg version')
@@ -110,19 +109,6 @@ class FFMpegProtocol(protocol.ProcessProtocol):
         if self.currentFPS < self.factory._targetFPS:
             log.msg("WARNING! Current encoding FPS (%s) below target FPS (%s) Not encoding fast enough! Reduce encoding quality!" % (self.currentFPS,self.factory._targetFPS))
     
-    def writeData(self,data):
-        """write data to STDIN of ffmpeg process"""
-        self.transport.write(data)
-    
     def outReceived(self, data):
         """Received data from ffmpegs STDOUT"""
         self.factory.sendDataToAllOutlets(data)
-
-    def processEnded(self, reason):
-        if(reason.value.exitCode):
-            log.msg("crashed")
-            log.msg("Process was: %s" % (self.factory.cmdline))
-            log.msg("Last message: %s" % (self.lastlogline))
-            self.factory.processCrashed()
-        else:
-            log.msg("ended.")

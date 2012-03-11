@@ -1,34 +1,77 @@
+#
 # kninterfaces.py
 # Copyright (c) 2012 Thorsten Philipp <kyrios@kyri0s.de>
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the "Software"), to deal in the 
+# Software without restriction, including without limitation the rights to use, copy,
+# modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, 
+# and to permit persons to whom the Software is furnished to do so, subject to the
+# following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+# PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+# HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION 
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
 
-# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+"""
+INKOutlets are consumers of data.
+IKNInlets are producers of data.
+Most objects are both.
 
-# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+.. moduleauthor:: Thorsten Philipp <kyrios@kyri0s.de>
 
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+"""
 from zope.interface import Interface, Attribute
 
-class IKNOutlet(Interface):
+class IKNStreamObject(Interface):
+    """An object implementing :class:`IKNStreamObject` produces or consumes data.
+    These objects can be started and stopped."""
+
+    running = Attribute("""Indicating wheter the StreamObject is running or not""")
+
+    def start():
+        """Start the StreamObject. Consume/Produce data. Notify outlets if there are any."""
+
+    def stop():
+        """Stop the StreamObject. Stop consuming/producing data. Notify outlets if there are any. Notify our IKNInlet if we have one."""
+
+
+class IKNOutlet(IKNStreamObject):
     """IKNOutlets receive data from IKNInlets and do something with it."""
     
+    inlet = Attribute("""The IKNInlet object sending us data. This shall be set by :method:`setInlet`""")
+
     def dataReceived(data):
         """Handle the data received."""
         
     def setInlet(inlet):
         """Register a data sender (Inlet) with us. Inlet has to be of type IKNOutlet"""
+
+
         
 
-class IKNInlet(Interface):
-    """IKNInlets generate data in some way. They will send the data to registered IKNOutlets"""
+class IKNInlet(IKNStreamObject):
+    """IKNInlets generate data in some way. They will send the data to registered IKNOutlets dataReceived method."""
+
+    outlets = Attribute("""List of registered outlets""")
+
     def addOutlet(outlet):
         """Register an outlet with us. The outlet has to be of type IKNOutlet"""
         
     def getStats():
         """Return a string with statistics about data flow (bits p second?)"""
 
-    def outletStarted():
-        """Our outlet is ready to receive data. Start the service. This effectivly is the start method of pure inlets."""
-        
+    def outletStarted(outlet):
+        """One of our outlets is ready to receive data."""
+
+
 
 
 class IKNRecorder(IKNOutlet):

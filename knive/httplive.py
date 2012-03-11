@@ -9,12 +9,17 @@
 import os
 import tempfile
 import shutil
+import re
 
 from twisted.internet       import reactor
+# from zope.interface import implements
+# from kninterfaces           import IKNOutlet
 
-from foundation import KNDistributor
+from foundation import KNDistributor, KNOutlet, KNProcessProtocol
 from ffmpeg     import FFMpeg
-from exceptions import *
+from channel    import Channel
+# from exceptions import 
+import knive
 
 class HTTPLiveStream(KNDistributor):
     """
@@ -147,12 +152,15 @@ class HTTPLiveVariantStream(KNDistributor):
         else:
             self.encoder = FFMpeg(encoderArguments=encoderArguments)
 
+        self.segmenter = HTTPLiveSegmenter(name=self.name+"_segmenter",destdir=self.destinationDirectory)
 
-
-        # self.segmenter = HTTPLiveSegmenter()
         # Hook everything up
         self.addOutlet(self.encoder)
-        # self._encoder.addOutlet(self._segmenter)
+        self.encoder.addOutlet(self.segmenter)
+
+    def willStart(self):
+        config = self._findObjectInInletChainOfClass(knive.Knive).config
+        self.segmenter.segmenterbin = config['paths']['segmenterbin']
 
         
     def setDestdir(self,destdir,createDir=False):
@@ -178,9 +186,9 @@ class HTTPLiveVariantStream(KNDistributor):
                 raise Exception("Directory does not exist %s" % destdir)
 
 
-class HTTPLiveSegmenter(KNDistributor):
+class HTTPLiveSegmenter(KNOutlet):
     """Cuts mpeg-ts streams in chunks and creates index files."""
-    def __init__(self,name="Unknown segmenter",segmenterbin='bin/segmenter',destdir=None,tempdir=None):
+    def __init__(self,name="Unknown segmenter",segmenterbin=None,destdir=None,tempdir=None):
         """
         Kwargs:
             name: Name of this segmenter.
@@ -190,11 +198,12 @@ class HTTPLiveSegmenter(KNDistributor):
         """
 
         super(HTTPLiveSegmenter, self).__init__(name=name)
-
         self.name = name
         """Name of this segmenter"""
 
-        self.segmenterbin = segmenterbin
+        self.segmenterbin = None
+        if segmenterbin:
+            self._setSegmenterbin(segmenterbin)
         """The segmenter binary to be used (path)"""
 
         self.m3u8 = None
@@ -217,18 +226,28 @@ class HTTPLiveSegmenter(KNDistributor):
 
 
         
-    def _didStart(self):
+    def _start(self):
         """All preparations done. Start the process"""
-        self.httpStream = self.findObjectInInletChainOfClass(HTTPLiveStream)
-        if not self.httpStream:
-            raise(CanNotStartError("No HTTPLiveStream object found in inlet chain."))
-        self._protocol.setName("segmenterProtocol")
-        self.m3u8 = HTTPLiveStreamM3U8(self._destinationDirectory)
-        self.m3u8.setParent(self)
-        args = ["live_segmenter","10",self._tempdir,self.parent.parent.name,self.parent.parent.name]
+        self.httpStream = self._findObjectInInletChainOfClass(HTTPLiveStream)
+        channel = self._findObjectInInletChainOfClass(Channel)
+        if not channel:
+            raise(Exception('Cant find channel'))
+        if self.segmenterbin is None:
+            self._setSegmenterbin(channel.config['paths']['segmenterbin'])
 
-        self.log.debug("Spawning Process: %s" % " ".join(args))
-        reactor.spawnProcess(self.protocol,self.parent.parent.config.get('Paths','segmenter'),args)
+
+        self.m3u8 = HTTPLiveStreamM3U8(self._destinationDirectory)
+
+        args = ["live_segmenter","10",self._tempdir,"Param1","Param2"]
+        self.cmdline = "%s %s" % (self.segmenterbin, " ".join(args))
+        self.log.debug("Spawning Process: %s" % self.cmdline)
+        reactor.spawnProcess(self._protocol,self.segmenterbin,args)
+
+    def _setSegmenterbin(self,segmenterbin):
+        if os.path.exists(segmenterbin):
+            self.segmenterbin = segmenterbin
+        else:
+            raise OSError(2, 'No such file or directory', segmenterbin)
 
     def dataReceived(self,data):
         """Data received from our inlet. Pipe this data to the ffmpeg process"""
@@ -252,22 +271,22 @@ class HTTPLiveSegmenter(KNDistributor):
         shutil.move(sourcefile,destfile)
         self.m3u8.writeIndexFile()
 
-class SegmenterProtocol(object):
-    """docstring for SegmenterPro"""
-    def __init__(self, arg):
-        """
-
-        Args:
-        arg (str): Description
-
-
-        Kwargs:
-        arg (str): Description
-
-
-        """
-        super(SegmenterProtocol, self).__init__()
-        self.arg = arg
+class SegmenterProtocol(KNProcessProtocol):
+    factory = None
+    REtransfer = re.compile('segmenter: *(?P<startindex>\d+), *(?P<lastindex>\d+), *(?P<end>\d+), *(?P<encodingprofile>\w+), *(?P<duration>\d+\.\d+)')
+    
+    def errReceived(self, data):
+        lines = str(data).splitlines()
+        for line in lines:
+        #segmenter: 1, 1, 0, 600
+        # <firstsegment>, <lastsegment>, <end>, <encodingprofile>
+            if len(line)>1:
+                segmentcommand = self.REtransfer.match(line)
+                if(segmentcommand):
+                    self.log.debug("Startindex: %s Lastindex: %s End: %s Encodingprofile: %s Duration: %s" % (segmentcommand.group(1),segmentcommand.group(2),segmentcommand.group(3),segmentcommand.group(4),segmentcommand.group(5)))
+                    self.factory.segmentReady(segmentcommand.group(1),segmentcommand.group(2),segmentcommand.group(3),segmentcommand.group(4),segmentcommand.group(5))
+                else:
+                    self.log.warn("%s" % line)
 
 
 class HTTPLiveStreamM3U8(object):
