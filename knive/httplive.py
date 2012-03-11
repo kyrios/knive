@@ -10,6 +10,9 @@ import os
 import tempfile
 import shutil
 import re
+import logging
+import datetime
+import time
 
 from twisted.internet       import reactor
 # from zope.interface import implements
@@ -103,8 +106,8 @@ class HTTPLiveStream(KNDistributor):
    
     def setLastIndex(self,lastIndex):
         """Update self.lastIndex if it's larger than the current value. This is called by variant streams everytime they write a segment."""
-        if (lastIndex > self._lastIndex):
-            self._lastIndex = lastIndex
+        if (lastIndex > self.lastIndex):
+            self.lastIndex = lastIndex
 
     def setDestdir(self,destdir,createDir=False):
         """docstring for setDestdir"""
@@ -236,7 +239,7 @@ class HTTPLiveSegmenter(KNOutlet):
             self._setSegmenterbin(channel.config['paths']['segmenterbin'])
 
 
-        self.m3u8 = HTTPLiveStreamM3U8(self._destinationDirectory)
+        self.m3u8 = HTTPLiveStreamM3U8(self._destinationDirectory,self)
 
         args = ["live_segmenter","10",self._tempdir,"Param1","Param2"]
         self.cmdline = "%s %s" % (self.segmenterbin, " ".join(args))
@@ -254,7 +257,7 @@ class HTTPLiveSegmenter(KNOutlet):
         if not self.running:
             raise(Exception("Process not running"))
         else:
-            self.protocol.writeData(data)
+            self._protocol.writeData(data)
     
     def segmentReady(self,startindex,lastindex,end,encodingprofile,duration):
         """A segment is ready for transfer"""
@@ -263,9 +266,9 @@ class HTTPLiveSegmenter(KNOutlet):
         
         self.httpStream.setLastIndex(int(lastindex))
         filename = "%s-%08d.ts" % (encodingprofile,int(lastindex))
-        sourcefile = "%s%s%s" % (self.tempdir,os.path.sep,filename)
-        destfile = "%s%s%s" % (self.destdir,os.path.sep,self.m3u8.addSegment(duration))
-        self.logger.debug("Copying file %s to %s" % (filename,destfile))
+        sourcefile = "%s%s%s" % (self._tempdir,os.path.sep,filename)
+        destfile = "%s%s%s" % (self._destinationDirectory,os.path.sep,self.m3u8.addSegment(duration))
+        self.log.debug("Copying file %s to %s" % (filename,destfile))
         
         #FIXME: This is propably a blocking call!
         shutil.move(sourcefile,destfile)
@@ -290,9 +293,109 @@ class SegmenterProtocol(KNProcessProtocol):
 
 
 class HTTPLiveStreamM3U8(object):
-    """docstring for HTTPLiveStreamM3U8"""
-    def __init__(self, arg):
+    """Representation of a HTTPLive Stream indexfile"""
+    def __init__(self, dstPath, httplivestreamvariant, startIndex=1, maxSegments=10, urlPrefix=None, filename="stream.m3u8", segmentLength=10, segmentPrefix="s", allowCache=False,version=3,extKey=None,datetime=datetime.time()):
         super(HTTPLiveStreamM3U8, self).__init__()
-        self.arg = arg
+        self.dstPath = dstPath
+        self.httplivestreamvariant = httplivestreamvariant
+        self.filename = filename
+        self.segmentLength = segmentLength
+        self.segmentPrefix = segmentPrefix
+        self.allowCache = allowCache
+        self.version = version
+        self.extKey = extKey
+        self.datetime = datetime
+        self.maxSegments = maxSegments
+        self.startIndex = startIndex
+        self.urlPrefix = urlPrefix
+        
+        self.lastIndex = self.startIndex
+        self.segmenttitle = None
+
+        self.logger = logging.getLogger('[%s]' % (self.__class__.__name__))
+
+        self.segments = []
+        
+    def setParent(self,parent):
+        """set self.parent and also inherit the lastIndex"""
+        super(HTTPLiveStreamM3U8,self).setParent(parent)
+        if self.lastIndex is None:
+            # print parent
+            self.lastIndex = self.httplivestreamvariant._findObjectInInletChainOfClass(HTTPLiveStream).lastIndex
+        self.segmenttitle = self.httplivestreamvariant._findObjectInInletChainOfClass(Channel).name
+        
+    def addSegment(self,segmentLength=10):
+        """Add a segment to the stream and return the filename of the the segment"""
+        segmentName = "%s-%d.ts" % (self.segmentPrefix, self.lastIndex)
+        segment = HTTPLiveStreamSegment(self.lastIndex,segmentName,self.segmentLength,time.time())
+        self.logger.debug("Segment name: %s Segment Length: %.1f Segment Time: %s " % (segment,float(segment.length),segment.iso8601()))
+        self.segments.append(segment)
+        self.lastIndex += 1
+        return(segment)
+        
+    def writeIndexFile(self):
+        """Write a current representation of the object to a file in self.dstPath + self.filename"""
+        
+        fd, m3u8tmpfilename = tempfile.mkstemp(suffix=".m3u8")
+        m3u8tmp = os.fdopen(fd, "w+b")
+        os.fchmod(fd,0664)
+        m3u8tmp.write("#EXTM3U\n")
+        m3u8tmp.write("#EXT-X-VERSION:%s\n" % (self.version))
+        m3u8tmp.write("#EXT-X-TARGETDURATION:%d\n" % int(self.segmentLength))
+        if self.allowCache:
+            m3u8tmp.write("#EXT-X-ALLOW-CACHE:YES\n")
+        else:
+            m3u8tmp.write("#EXT-X-ALLOW-CACHE:NO\n")
+        
+        # EXT-X-MEDIASEQUENCE
+        # For sliding-window (live) streams this is the lastIndex - 3.
+        # For timeshift it is the firstIndex since start
+        # For non-sliding-window it's the firstIndex
+        mediasequence = 1
+        if self.parent.findParentOfType(HTTPLiveStream).slidingWindow:
+            self.logger.debug("Sliding window stream. Current last index: %s" % self.lastIndex)
+            mediasequence = self.lastIndex - 3
+        else:
+            mediasequence = self.startIndex
+        
+        if(mediasequence < 1):
+            mediasequence = 1
+        m3u8tmp.write("#EXT-X-MEDIA-SEQUENCE:%d\n" % int(mediasequence))
+        
+        
+        for segment in self.segments[(self.maxSegments*-1):]:
+            m3u8tmp.write("#EXT-X-PROGRAM-DATE-TIME:%s\n" % (segment.iso8601()))
+            m3u8tmp.write("#EXTINF:%0.2f,%s\n" % (float(segment.length), self.segmenttitle))
+            if self.urlPrefix is not None:
+                m3u8tmp.write("%s/" % self.urlPrefix)
+            m3u8tmp.write("%s\n" % (segment.filename))
+        
+        
+        m3u8tmp.close()
+        destfile = "%s%s%s" % (self.dstPath,os.path.sep,self.filename)
+        self.logger.debug("Moving %s to %s" % (m3u8tmpfilename,destfile))
+        shutil.move(m3u8tmpfilename,destfile)
+        ##EXTM3U
+        #EXT-X-TARGETDURATION:7
+        #EXT-X-MEDIA-SEQUENCE:0
+        #EXTINF:7,    
+        #fileSequence0.ts
+        #EXT-X-ENDLIST
+
+
+class HTTPLiveStreamSegment(object):
+    """An individual segment in a HTTPLiveStreamVariant"""
+    def __init__(self, index, filename, length, timestamp):
+        super(HTTPLiveStreamSegment, self).__init__()
+        self.index = index
+        self.filename = filename
+        self.length = length
+        self.timestamp = timestamp
+        
+    def __str__(self):
+        return str(self.filename)
+        
+    def iso8601(self):
+        return time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime(self.timestamp))
         
       
