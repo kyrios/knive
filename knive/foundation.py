@@ -60,6 +60,112 @@ class KNStreamObject(object):
         else:
             return self.__instance__
 
+
+class KNInlet(KNStreamObject):
+    """Implementation of :class:`IKNInlet`"""
+    implements(IKNInlet)
+    def __init__(self, name=None):
+        super(KNInlet, self).__init__(name=name)
+        self.name = name
+        self.outlets = []
+
+
+    def start(self):
+        """Start the module and all outlets. Notify the inlet when everything is running. Do not override this."""
+        self.runningOutlets = 0
+
+        defStarted = Deferred()
+
+        self.log.debug('Starting. Outlets are: %s' % self.outlets)
+        if not len(self.outlets):
+            raise(ServiceRunningWithoutOutlets)
+
+        if not self.running:
+
+            self._willStart()
+
+            # Start the outlets
+            def _outletStarted(object):
+                self.runningOutlets += 1
+                if self.runningOutlets >= len(self.outlets):
+                    #All outlets started
+                    _allOutletsStarted()
+
+            def _allOutletsStarted():
+                self.running = True
+                self._start()
+                self.log.debug("Did start")
+                defStarted.callback(self)
+
+            for outlet in self.outlets:
+                if not outlet.running:
+                    self.log.debug('Starting outlet %s' % outlet)
+                    d = maybeDeferred(outlet.start)
+                    d.addCallback(_outletStarted)
+                else:
+                    _outletStarted(outlet)
+            if not len(self.outlets):
+                _allOutletsStarted()
+        else:
+            self.log.warning("%s is already running. Can not start" % self)
+            d.errback('%s is already running. Can not start' % self)
+
+        return defStarted
+
+    def _willStart(self):
+        """Stuff to be done before outlets gets the start command (implemented for IKNInlet)"""
+        pass
+
+    def _start(self):
+        """Stuff to be done after all outlets have started but before the inlet is notified (IKNInlet)"""
+        pass
+
+    def _didStartAndNotifiedInlet(self):
+        """Stuff to be done after all outlets have started and the inlet was notified (INKNInlet)"""
+        pass
+
+    def outletStarted(self,outlet):
+        """called by our outlets after they started (IKNInlet)"""
+        pass
+
+    def _startFailed(self,outlet):
+        pass
+
+    def addOutlet(self,outlet):
+        """Outlets receive data from the service when the service is running. Outlets need to be of type IKNOutlet.
+        If not already done this service will be set as inlet on the specified outlet."""
+        #
+        self.log.debug('Adding outlet %s to %s' % (outlet,self))
+        # print "Self.outlets:%s (%s)" % (self.outlets,id(self.outlets))
+        # print "Outlet.outlets: %s (%s)" % (outlet.outlets,id(outlet.outlets))
+        # return()
+        if IKNOutlet.providedBy(outlet):
+            if outlet.inlet != self:
+                outlet.setInlet(self,recursiveCall=False)
+            if outlet not in self.outlets:
+                if outlet is not self:
+                    self.outlets.append(outlet)
+                    # print "Self.outlets:%s" % self.outlets
+                    # print "Outlet.outlets: %s" % outlet.outlets
+                else:
+                    raise(Exception("Can't be an outlet of myself"))                    
+
+        else:
+            raise(Exception('%s does not implement %s' % (outlet,IKNOutlet)))
+
+    def removeOutlet(self,outlet):
+        """Remove the outlet from the list of outlets. The outlet will no longer receive any data."""
+        if outlet in self.outlets:
+            self.outlets.remove(outlet)
+            outlet.inlet = None
+            if outlet.running:
+                raise(ServiceRunningWithouInlet)
+        
+    def getStats():
+        """Return a string with statistics about data flow (bits p second?)"""
+        pass
+        
+
 class KNOutlet(KNStreamObject):
     """Implementation of :class:`IKNOutlet`"""
     implements(IKNOutlet)
@@ -146,6 +252,7 @@ class KNDistributor(KNOutlet):
                 raise(Exception('Can only change inlet if not running.'))
             elif value is not None:
                 self.__dict__[name] = IKNInlet(value)
+                self.inlet.addOutlet(self)
             else:
                 self.__dict__[name] = None
         else:
@@ -224,6 +331,7 @@ class KNDistributor(KNOutlet):
                 self._start()
                 self.log.debug("Did start")
                 self.log.debug("Will notify %s that I started" % self.inlet)
+                self.inlet.start()
                 defStarted.callback(self)
                 self.log.debug("Started and notified %s" % self.inlet)
                 self._didStartAndNotifiedInlet()
@@ -236,7 +344,6 @@ class KNDistributor(KNOutlet):
                 _allOutletsStarted()
         else:
             self.log.warning("%s is already running. Can not start" % self)
-            d.errback('%s is already running. Can not start' % self)
 
         return defStarted
 
@@ -254,7 +361,7 @@ class KNDistributor(KNOutlet):
 
     def outletStarted(self,outlet):
         """called by our outlets after they started (IKNInlet)"""
-        self._start()
+        pass
 
     def _startFailed(self,outlet):
         pass
