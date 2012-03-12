@@ -43,7 +43,6 @@ class TCPTSClientFactory(ReconnectingClientFactory):
 
     def clientConnectionFailed(self, connector, reason):
         log.err('connection failed: %s' % reason)
-        self.protocol.connectionEstablished = False
         if self.continueTrying:
             self.connector = connector
             self.retry()

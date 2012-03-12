@@ -13,6 +13,7 @@ import re
 import logging
 import datetime
 import time
+import string
 
 from twisted.internet       import reactor
 # from zope.interface import implements
@@ -89,7 +90,7 @@ class HTTPLiveStream(KNDistributor):
         """
 
         self.log.info('Creating new HTTPLiveVariantStream: %s' % name)
-        httpliveStreamvariant = HTTPLiveVariantStream('%s/%s' % (self.name,name),config,ffmpegbin=ffmpegbin,destdir=self._destdir + os.path.sep + name)
+        httpliveStreamvariant = HTTPLiveVariantStream(name,config,ffmpegbin=ffmpegbin,destdir=self._destdir + os.path.sep + name)
         self.addQuality(httpliveStreamvariant)
         return httpliveStreamvariant
 
@@ -232,16 +233,23 @@ class HTTPLiveSegmenter(KNOutlet):
     def _start(self):
         """All preparations done. Start the process"""
         self.httpStream = self._findObjectInInletChainOfClass(HTTPLiveStream)
+        variant = self._findObjectInInletChainOfClass(HTTPLiveVariantStream)
         channel = self._findObjectInInletChainOfClass(Channel)
         if not channel:
             raise(Exception('Cant find channel'))
         if self.segmenterbin is None:
             self._setSegmenterbin(channel.config['paths']['segmenterbin'])
 
+        # Fileprefix
+        valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
+        filePrefix = "%s-%s-" % (channel.slug,variant.name)
+        filePrefix = ''.join(c for c in filePrefix if c in valid_chars)
+        self.log.debug("FilePrefix: '%s'" % filePrefix)
+
 
         self.m3u8 = HTTPLiveStreamM3U8(self._destinationDirectory,self)
-
-        args = ["live_segmenter","10",self._tempdir,"Param1","Param2"]
+        
+        args = ["live_segmenter","10",self._tempdir,filePrefix,filePrefix]
         self.cmdline = "%s %s" % (self.segmenterbin, " ".join(args))
         self.log.debug("Spawning Process: %s" % self.cmdline)
         reactor.spawnProcess(self._protocol,self.segmenterbin,args)
@@ -266,9 +274,9 @@ class HTTPLiveSegmenter(KNOutlet):
         
         self.httpStream.setLastIndex(int(lastindex))
         filename = "%s-%08d.ts" % (encodingprofile,int(lastindex))
-        sourcefile = "%s%s%s" % (self._tempdir,os.path.sep,filename)
-        destfile = "%s%s%s" % (self._destinationDirectory,os.path.sep,self.m3u8.addSegment(duration))
-        self.log.debug("Copying file %s to %s" % (filename,destfile))
+        sourcefile = os.path.abspath("%s%s%s" % (self._tempdir,os.path.sep,filename))
+        destfile = os.path.abspath("%s%s%s" % (self._destinationDirectory,os.path.sep,self.m3u8.addSegment(duration)))
+        self.log.debug("Moving file %s to %s" % (sourcefile,destfile))
         
         #FIXME: This is propably a blocking call!
         shutil.move(sourcefile,destfile)
@@ -276,20 +284,21 @@ class HTTPLiveSegmenter(KNOutlet):
 
 class SegmenterProtocol(KNProcessProtocol):
     factory = None
-    REtransfer = re.compile('segmenter: *(?P<startindex>\d+), *(?P<lastindex>\d+), *(?P<end>\d+), *(?P<encodingprofile>\w+), *(?P<duration>\d+\.\d+)')
+    REtransfer = re.compile('segmenter: *(?P<startindex>\d+), *(?P<lastindex>\d+), *(?P<end>\d+), *(?P<encodingprofile>[^,]+), *(?P<duration>\d+\.\d+)')
     
     def errReceived(self, data):
         lines = str(data).splitlines()
         for line in lines:
         #segmenter: 1, 1, 0, 600
         # <firstsegment>, <lastsegment>, <end>, <encodingprofile>
+        # Example: 'segmenter: 1, 46, 0, bus-wifi-, 10.00'
             if len(line)>1:
                 segmentcommand = self.REtransfer.match(line)
                 if(segmentcommand):
                     self.log.debug("Startindex: %s Lastindex: %s End: %s Encodingprofile: %s Duration: %s" % (segmentcommand.group(1),segmentcommand.group(2),segmentcommand.group(3),segmentcommand.group(4),segmentcommand.group(5)))
                     self.factory.segmentReady(segmentcommand.group(1),segmentcommand.group(2),segmentcommand.group(3),segmentcommand.group(4),segmentcommand.group(5))
                 else:
-                    self.log.warn("%s" % line)
+                    self.log.warn("Unknown line from segmenter:'%s'" % line)
 
 
 class HTTPLiveStreamM3U8(object):
@@ -351,12 +360,16 @@ class HTTPLiveStreamM3U8(object):
         # For sliding-window (live) streams this is the lastIndex - 3.
         # For timeshift it is the firstIndex since start
         # For non-sliding-window it's the firstIndex
+
+        # Disabled.. let's assume users can navigate to the beginning of a file if they want to
+        # mediasequence = 1
+        # if self.parent.findParentOfType(HTTPLiveStream).slidingWindow:
+        #     self.logger.debug("Sliding window stream. Current last index: %s" % self.lastIndex)
+        #     mediasequence = self.lastIndex - 3
+        # else:
+        #     mediasequence = self.startIndex
         mediasequence = 1
-        if self.parent.findParentOfType(HTTPLiveStream).slidingWindow:
-            self.logger.debug("Sliding window stream. Current last index: %s" % self.lastIndex)
-            mediasequence = self.lastIndex - 3
-        else:
-            mediasequence = self.startIndex
+        mediasequence = self.lastIndex - 3
         
         if(mediasequence < 1):
             mediasequence = 1
