@@ -1,6 +1,28 @@
+#!/usr/bin/env python
+#
+# ffmpeg.py
+# Copyright (c) 2012 Thorsten Philipp <kyrios@kyri0s.de>
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the "Software"), to deal in the 
+# Software without restriction, including without limitation the rights to use, copy,
+# modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, 
+# and to permit persons to whom the Software is furnished to do so, subject to the
+# following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+# PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+# HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION 
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
 import re
-from foundation import KNDistributor
-from twisted.internet       import protocol, reactor
+from foundation import KNDistributor, KNProcessProtocol
+from twisted.internet       import reactor
 from twisted.python         import log
 
 
@@ -16,6 +38,7 @@ class FFMpeg(KNDistributor):
         self.protocol.factory = self
         self.ffmpegbin = ffmpegbin
         self.encoderArguments = encoderArguments
+
         self._targetFPS = 25
         try:
             self._targetFPS = self.encoderArguments['r']
@@ -24,7 +47,9 @@ class FFMpeg(KNDistributor):
         
         self.fargs = ['ffmpeg','-y','-i','-']
         for key in self.encoderArguments.keys():
-            if type(self.encoderArguments[key]) == tuple: #Some ffmpeg argument may apear more than once. (-vpre)
+            if self.encoderArguments[key] is None:
+                continue # No None values
+            if type(self.encoderArguments[key]) == tuple or type(self.encoderArguments[key]) == list : #Some ffmpeg argument may apear more than once. (-vpre)
                 for val in self.encoderArguments[key]:
                     self.fargs.append("-%s" % key)
                     self.fargs.append("%s" % val)
@@ -39,7 +64,7 @@ class FFMpeg(KNDistributor):
         self.log.debug("FFMpegcommand: %s %s" % (self.ffmpegbin," ".join(self.fargs)))
         self.cmdline = "%s %s" % (self.ffmpegbin," ".join(self.fargs))
         
-    def didStart(self):
+    def _start(self):
         """Stuff to be done after all outlets have started but before the inlet is notified"""
         self.log.debug('Spawning new FFMpeg process')
         reactor.spawnProcess(self.protocol,self.ffmpegbin,self.fargs)
@@ -49,12 +74,11 @@ class FFMpeg(KNDistributor):
         if not self.running:
             raise(Exception("Process not running"))
         else:
-            self.protocol.writeData(data)
+            self.protocol.writeData(data)    
 
 
-class FFMpegProtocol(protocol.ProcessProtocol):
+class FFMpegProtocol(KNProcessProtocol):
     """Parsing and communication with FFMpeg"""
-    factory = None
     fps = 0
     # Output matching
     REversion = re.compile('FFmpeg version')
@@ -67,9 +91,9 @@ class FFMpegProtocol(protocol.ProcessProtocol):
     
     def errReceived(self, data):
         lines = str(data).splitlines()
-        #log.msg(data)
+        log.msg(data)
         for line in lines:
-            self.lastlogline = line
+            self._lastlogline = line
             if(self.__class__.REversion.match(line)):
                 log.msg(line)
             elif(self.__class__.REencodingStats.match(line)):
@@ -78,7 +102,7 @@ class FFMpegProtocol(protocol.ProcessProtocol):
             elif(self.__class__.REencodingStatsAudio.match(line)):
                 self.stats = line
             else:
-                self.lastlogline = line
+                self._lastlogline = line
                 log.msg("%s" % (line))
 
     def updateStats(self,line):
@@ -88,19 +112,6 @@ class FFMpegProtocol(protocol.ProcessProtocol):
         if self.currentFPS < self.factory._targetFPS:
             log.msg("WARNING! Current encoding FPS (%s) below target FPS (%s) Not encoding fast enough! Reduce encoding quality!" % (self.currentFPS,self.factory._targetFPS))
     
-    def writeData(self,data):
-        """write data to STDIN of ffmpeg process"""
-        self.transport.write(data)
-    
     def outReceived(self, data):
         """Received data from ffmpegs STDOUT"""
         self.factory.sendDataToAllOutlets(data)
-
-    def processEnded(self, reason):
-        if(reason.value.exitCode):
-            log.msg("crashed")
-            log.msg("Process was: %s" % (self.factory.cmdline))
-            log.msg("Last message: %s" % (self.lastlogline))
-            self.factory.processCrashed()
-        else:
-            log.msg("ended.")
