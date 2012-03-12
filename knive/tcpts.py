@@ -43,12 +43,14 @@ class TCPTSClientFactory(ReconnectingClientFactory):
 
     def clientConnectionFailed(self, connector, reason):
         log.err('connection failed: %s' % reason)
+        self.protocol.connectionEstablished = False
         if self.continueTrying:
             self.connector = connector
             self.retry()
     
     def clientConnectionLost(self, connector, reason):
         log.err('connection lost: %s' % reason)
+        self.protocol.connectionEstablished = False
         if self.continueTrying:
             self.connector = connector
             self.retry()
@@ -58,6 +60,10 @@ class TCPTSClientFactory(ReconnectingClientFactory):
         self.protocol = TCPTSClientProtocol()
         self.protocol.factory = self
         return self.protocol
+
+    def sendData(self,data):
+        if self.protocol.connectionEstablished:
+            self.protocol.sendData(data)
                 
         
 class TCPTSClient(KNOutlet):
@@ -73,7 +79,6 @@ class TCPTSClient(KNOutlet):
         self.factory.service = self
         self.factory.secret = secret
         self.connection = internet.TCPClient(self.hostname, self.port, self.factory)
-        self.canSendData = False
         
     def logPrefix(self):
         """docstring for logPrefix"""
@@ -92,7 +97,6 @@ class TCPTSClient(KNOutlet):
             else:
                 if self.factory.protocol.state == 99:
                     self.log.info('Connection established')
-                    self.canSendData = True
                     defer.callback(self)
                     return
                 else:
@@ -105,10 +109,7 @@ class TCPTSClient(KNOutlet):
                 
     def dataReceived(self,data):
         """docstring for dataReceived"""
-        if self.canSendData:
-            self.factory.protocol.transport.write(data)
-        else:
-            log.err("Service not running yet. Can't send data")
+        self.factory.sendData(data)
         
     def connectionFailed(self):
         """docstring for connectionFailed"""
@@ -121,11 +122,18 @@ class TCPTSClient(KNOutlet):
 class TCPTSClientProtocol(basic.LineReceiver):
     """docstring for TCPTSClientProtocol"""
     challenge = None
+    connectionEstablished = False
     
     def connectionMade(self):
         self.state = 0
         self.challenge = None
+        self.connectionEstablished = True
         log.msg("Connected TCPTSClientProto")
+
+    def sendData(self,data):
+        """Sending of payload data after the connection is established and handshake is ready"""
+        if self.state == 99:
+            self.transport.write(data)
     
     def lineReceived(self,line):
         """docstring for lineReceived"""
