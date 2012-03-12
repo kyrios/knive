@@ -68,11 +68,13 @@ class KNInlet(KNStreamObject):
         super(KNInlet, self).__init__(name=name)
         self.name = name
         self.outlets = []
+        self.starting = False
 
 
     def start(self):
         """Start the module and all outlets. Notify the inlet when everything is running. Do not override this."""
         self.runningOutlets = 0
+        
 
         defStarted = Deferred()
 
@@ -80,7 +82,13 @@ class KNInlet(KNStreamObject):
         if not len(self.outlets):
             raise(ServiceRunningWithoutOutlets)
 
+        if self.starting:
+            self.log.debug('Already starting.')
+            return
+
+
         if not self.running:
+            self.starting = True
 
             self._willStart()
 
