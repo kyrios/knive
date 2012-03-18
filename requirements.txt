@@ -1,0 +1,6 @@
+Twisted==11.0.0
+pyasn1==0.1.2 # manhole
+pycrypto==2.5 # manhole
+
+autobahn==0.4.10 # websocket
+configobj==4.7.2
