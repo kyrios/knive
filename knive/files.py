@@ -21,15 +21,10 @@
 #
 
 from twisted.internet       import fdesc, reactor
-from zope.interface import implements
-from twisted.application    import service
 from twisted.python         import log
 from foundation             import KNOutlet
 import os
 import shutil
-
-import  foundation
-
 
 class FileWriter(KNOutlet):
     """Write data received from self.inlet to file specified during init"""
@@ -57,7 +52,7 @@ class FileWriter(KNOutlet):
     def startService(self):
         """docstring for startService"""
         log.msg("Starting %s" % self)
-        filename = self.getFileName()
+        self.filename = self.getFileName()
         def checkAndMove(filename,offset=0):
             if os.path.isfile(self._outfileName) and offset <= self.keepFiles:
                 offset += 1

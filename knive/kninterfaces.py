@@ -34,12 +34,12 @@ class IKNStreamObject(Interface):
     """An object implementing :class:`IKNStreamObject` produces or consumes data.
     These objects can be started and stopped."""
 
-    running = Attribute("""Indicating wheter the StreamObject is running or not""")
+    running = Attribute("""Indicating whether the StreamObject is running or not""")
 
-    def start():
+    def start(self):
         """Start the StreamObject. Consume/Produce data. Notify outlets if there are any."""
 
-    def stop():
+    def stop(self):
         """Stop the StreamObject. Stop consuming/producing data. Notify outlets if there are any. Notify our IKNInlet if we have one."""
 
 
@@ -48,10 +48,10 @@ class IKNOutlet(IKNStreamObject):
     
     inlet = Attribute("""The IKNInlet object sending us data. This shall be set by :method:`setInlet`""")
 
-    def dataReceived(data):
+    def dataReceived(self, data):
         """Handle the data received."""
         
-    def setInlet(inlet):
+    def setInlet(self, inlet):
         """Register a data sender (Inlet) with us. Inlet has to be of type IKNOutlet"""
 
 
@@ -62,16 +62,16 @@ class IKNInlet(IKNStreamObject):
 
     outlets = Attribute("""List of registered outlets""")
 
-    def addOutlet(outlet):
+    def addOutlet(self, outlet):
         """Register an outlet with us. The outlet has to be of type IKNOutlet"""
 
-    def removeOutlet(outlet):
+    def removeOutlet(self, outlet):
         """Remove an outlet from us."""
         
-    def getStats():
+    def getStats(self):
         """Return a string with statistics about data flow (bits p second?)"""
 
-    def outletStarted(outlet):
+    def outletStarted(self, outlet):
         """One of our outlets is ready to receive data."""
 
 
@@ -80,7 +80,7 @@ class IKNInlet(IKNStreamObject):
 class IKNRecorder(IKNOutlet):
     """A special IKNOutlet that will make data persistent after startRecording is called. You need to supply an Episode object.
     Episodes store information such as 'starttime', 'endtime' and metadata for this recording."""
-    def startRecording(episode,autoStop=None):
+    def startRecording(self, episode, autoStop=None):
         """Start the recording of received data.
         Arguments:
         episode: The current episode that is to be recorded. Register this recording with the episode by calling episode.register(IKNRecording-instance)
@@ -90,7 +90,7 @@ class IKNRecorder(IKNOutlet):
         On success an IKNRecording object is returned.
         """
 
-    def stopRecording():
+    def stopRecording(self):
         """Stop the recording process."""
 
 class IKNRecording(Interface):

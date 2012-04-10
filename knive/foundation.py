@@ -25,7 +25,7 @@
 
 """
 
-from kninterfaces           import IKNStreamObject, IKNOutlet, IKNInlet
+from kninterfaces           import IKNStreamObject, IKNOutlet, IKNInlet, IKNRecorder
 from zope.interface         import implements
 from twisted.internet.defer import Deferred, maybeDeferred
 from twisted.internet       import protocol, reactor
@@ -93,7 +93,7 @@ class KNInlet(KNStreamObject):
             self._willStart()
 
             # Start the outlets
-            def _outletStarted(object):
+            def _outletStarted(obj):
                 self.runningOutlets += 1
                 if self.runningOutlets >= len(self.outlets):
                     #All outlets started
@@ -169,7 +169,7 @@ class KNInlet(KNStreamObject):
             if outlet.running:
                 raise(ServiceRunningWithouInlet)
         
-    def getStats():
+    def getStats(self):
         """Return a string with statistics about data flow (bits p second?)"""
         pass
 
@@ -334,7 +334,7 @@ class KNDistributor(KNOutlet):
             self._willStart()
 
             # Start the outlets
-            def _outletStarted(object):
+            def _outletStarted(obj):
                 self.runningOutlets += 1
                 if self.runningOutlets >= len(self.outlets):
                     #All outlets started
@@ -381,7 +381,9 @@ class KNDistributor(KNOutlet):
         pass
 
     def startRecording(self, autoStop=None):
-        """Send 'startRecording' message to every outlet that conforms to IKNRecorder. IKNRecorder implementations make streams persistent.
+        """
+        Send 'startRecording' message to every outlet that conforms to 
+        IKNRecorder. IKNRecorder implementations make streams persistent.
         Keyword Arguments:
         autoStop: Automatically stop this recording in x seconds
         """
@@ -395,8 +397,11 @@ class KNDistributor(KNOutlet):
             if autoStop:
                 reactor.callLater(autoStop,outlet.stopRecording)
 
-    def stopRecording():
-        """Stop recording of the content. Also send 'stopRecording' to every outlet that conforms to IKNRecorder."""
+    def stopRecording(self):
+        """
+        Stop recording of the content. Also send 'stopRecording' to every
+        outlet that conforms to IKNRecorder.
+        """
         self.log.info('Stopping recording')
         for outlet in self.outlets:
             if IKNRecorder.implementedBy(outlet.__class__):
@@ -461,7 +466,10 @@ class KNProcessProtocol(protocol.ProcessProtocol):
         self.log = logging.getLogger('[%s]' % (self.__class__.__name__))
 
     def errReceived(self,data):
-        """This is STDERR of the process. Everything gets written to the log. If this is usefull information override this method"""
+        """
+        This is STDERR of the process. Everything gets written to the log. If
+        this is useful information override this method
+        """
         lines = str(data).splitlines()
         #log.msg(data)
         for line in lines:

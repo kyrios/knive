@@ -26,17 +26,17 @@
 """
 class ServiceRunningWithouInlet(Exception):
     """Raised when an IKNOutlet is started without a valid inlet. This IKNOutlet will not receive any data"""
-    def something():
+    def something(self):
         pass
 
 class CanNotStartError(Exception):
-    """A service could not start sucesfuly."""
-    def something():
+    """A service could not start successfully."""
+    def something(self):
         pass
 
 class ServiceRunningWithoutOutlets(Exception):
     """Raised when an IKNInlet is started without valid IKNOutlets to send data to."""
-    def something():
+    def something(self):
         pass
         
         
