@@ -42,6 +42,3 @@ In the next weeks/month the following features will be added:
 * MP3 Stream Fallback
 
 
-
-
-
