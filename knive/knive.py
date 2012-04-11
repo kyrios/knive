@@ -18,6 +18,7 @@ from tcpts      import TCPTSServer
 from httplive   import HTTPLiveStream
 from kninterfaces   import IKNInlet
 from files import FileWriter
+from gstreamer import GstInlet
 
 from twisted.application        import service
 
@@ -74,6 +75,11 @@ class Knive(service.MultiService):
                                                 secret=configObject['source']['sharedSecret'],
                                                 port=configObject['source']['listenPort']
                                             )
+        elif configObject['source']['type'] == 'GstInlet':
+            channel.inlet = GstInlet(
+                name = configObject['source']['name'],
+                pipeline = configObject['source']['pipeline']
+            )
         else:
             print "Unknown Inlet Type %s" % self.config['source']['type']
             sys.exit(1)
