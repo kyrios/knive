@@ -167,9 +167,9 @@ class HTTPLiveVariantStream(KNDistributor):
         self.setDestdir(destdir)
         # Set up the encoder
         if ffmpegbin:
-            self.encoder = FFMpeg(ffmpegbin=ffmpegbin,encoderArguments=encoderArguments)
+            self.encoder = FFMpeg(name=name, ffmpegbin=ffmpegbin,encoderArguments=encoderArguments)
         else:
-            self.encoder = FFMpeg(encoderArguments=encoderArguments)
+            self.encoder = FFMpeg(name=name, encoderArguments=encoderArguments)
 
         self.segmenter = HTTPLiveSegmenter(name=self.name+"_segmenter",destdir=self.destinationDirectory)
 

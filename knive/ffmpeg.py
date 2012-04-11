@@ -27,13 +27,13 @@ from twisted.python         import log
 
 
 class FFMpeg(KNDistributor):
-    def __init__(self,ffmpegbin='/usr/bin/ffmpeg',encoderArguments=None):
+    def __init__(self, name=None, ffmpegbin='/usr/bin/ffmpeg', encoderArguments=None):
         """Start a ffmpeg process.
         ffmpegbin:          path to ffmpeg
         encoderArguments:   a dictionary of ffmpeg arguments. 
                             If the value of a item is None it 
                             is considered to have no value. (Example: -vn)"""
-        super(FFMpeg,self).__init__(name='FFMpeg')
+        super(FFMpeg,self).__init__(name='%s_FFMpeg' % name)
         self.protocol = FFMpegProtocol()
         self.protocol.factory = self
         self.ffmpegbin = ffmpegbin
