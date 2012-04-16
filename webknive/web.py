@@ -111,7 +111,7 @@ class WebChannels(KniveResource):
         returnSon = {}
         returnSon['success'] = True
         returnSon['channels'] = []
-        for stream in self.backend.streams:
+        for stream in self.backend.channels:
                 stre = {}
                 stre['id'] = 1
                 stre['name'] = stream.name

@@ -1,6 +1,6 @@
 Ext.define('KN.view.Show.Create', {
     extend: 'Ext.window.Window',
-    alias: 'widget.createShow',
+    alias: 'widget.showCreate',
     layout: 'fit',
     title: 'Create new Show',
     height: 300,
