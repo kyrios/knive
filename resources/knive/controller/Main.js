@@ -3,17 +3,18 @@ Ext.define('KN.controller.Main', {
     views: [
                 'Logconsole',
                 'Settings',
-                'ShowTabs'
+                'ShowTabs',
+                'Show.Create',
+                'Show.Overview'
     ],
     stores: [
-                // 'Show.Navigation'
                 'Show'
     ],
     refs: [{
         ref: 'createShow',
         selector: 'createShow',
-        autoCreate: true,
-        xtype: 'createShow',
+        forceCreate: true,
+        xtype: 'showCreate',
     },
     {
         ref: 'openSettings',
@@ -47,7 +48,7 @@ Ext.define('KN.controller.Main', {
             showName: show,
         })
         showController.init()
-        var showView = Ext.create('KN.view.Show')
+        var showView = Ext.create('KN.view.Show.Overview')
         showView.title = show
         showTab.add(showView)
     },
