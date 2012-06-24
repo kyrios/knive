@@ -29,7 +29,7 @@ class WebKnive(service.Service):
         
          
         self.root = static.File(self.resourcepath)         
-        self.root.putChild('data',WebData(self.backend))
+        self.root.putChild('apiV1',WebAPIV1(self.backend))
        
         #self.wsFact = broadcast.BroadcastServerFactory("ws://localhost:9002")
         # root.putChild("doc", static.File("/usr/share/doc"))
@@ -58,6 +58,12 @@ class WebKnive(service.Service):
     def write(self,message):
         """docstring for write"""
         self.wsFact.logMessage(message)
+
+
+def jsonResponse(data,success=True,statusMessage=None):
+    data['success'] = success
+    data['statusMessage'] = statusMessage
+    return json.dumps(data)
 
 
 class KniveResource(Resource):
@@ -91,12 +97,57 @@ class WebRootTree(KniveResource):
             
         return json.dumps(returnSon)
 
-class WebData(KniveResource):
+class WebAPIV1(KniveResource):
     """docstring for WebData"""
+
     def setup(self):
-        self.putChild('channel',WebChannels(self.backend))
-        self.putChild('root',WebRootTree(self.backend))
-        
+        self.channels = {}
+
+    def getChild(self,name, request):
+        try:
+            print 'Looking for %s in cache' % name
+            return(self.channels[name])
+        except KeyError:
+            print 'Searching %s in channel objects' % name
+            for channel in self.backend.channels:
+                if channel.slug == name:
+                    webChannel = WebChannel(channel)
+                    self.channels[channel.slug] = webChannel
+                    return webChannel
+        # print request.postpath
+        # print request.prepath
+        # apiVersion = request.prepath[0]
+        # channel = request.prepath[1]
+        # print 'Requesting Channel %s' % channel
+        # print self.backend.channels
+    # def setup(self):
+    #     print 'Channel List'
+    #     print self.backend.channels
+    #     for channel in self.backend.channels:
+    #         print '.....................%s' % channel
+    #     sys.exit(1)
+    #     self.putChild('channel',WebChannels(self.backend))
+    #     self.putChild('root',WebRootTree(self.backend))
+
+
+
+class WebChannel(Resource):
+    """A API representation of a Knive.Channel object"""
+    def __init__(self, channel):
+        Resource.__init__(self)
+        self.channel = channel
+
+    def render_GET(self,request):
+        print self.channel.config['channels']
+        for outlet in self.channel.config['channels'][self.channel.name]['outlets']:
+            print outlet
+        return jsonResponse({'episodes':self.channel.episodes, 'qualities': None})
+
+    def render_POST(self,request):
+        # self.channel.
+        return jsonResponse({'id':1})
+
+                       
         
         
 class WebChannels(KniveResource):
@@ -104,7 +155,7 @@ class WebChannels(KniveResource):
     
     def setup(self):
         """docstring for setup"""
-        self.isLeaf = True
+        self.isLeaf = False
         
     def render_GET(self,request):
         """docstring for render_GET"""
