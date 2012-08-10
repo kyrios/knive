@@ -61,9 +61,11 @@ class WebKnive(service.Service):
 
 
 def jsonResponse(data,success=True,statusMessage=None):
-    data['success'] = success
-    data['statusMessage'] = statusMessage
-    return json.dumps(data)
+    jsondata = {}
+    jsondata['payload'] = data
+    jsondata['success'] = success
+    jsondata['statusMessage'] = statusMessage
+    return json.dumps(jsondata)
 
 
 class KniveResource(Resource):
@@ -103,6 +105,9 @@ class WebAPIV1(KniveResource):
     def setup(self):
         self.channels = {}
 
+    def render_GET(self,request):
+        return 'APIV1'
+
     def getChild(self,name, request):
         try:
             print 'Looking for %s in cache' % name
@@ -114,12 +119,13 @@ class WebAPIV1(KniveResource):
                     webChannel = WebChannel(channel)
                     self.channels[channel.slug] = webChannel
                     return webChannel
-        # print request.postpath
-        # print request.prepath
-        # apiVersion = request.prepath[0]
-        # channel = request.prepath[1]
-        # print 'Requesting Channel %s' % channel
-        # print self.backend.channels
+        print request.postpath
+        print request.prepath
+        apiVersion = request.prepath[0]
+        channel = request.prepath[1]
+        print 'Requesting Channel %s' % channel
+        print self.backend.channels
+
     # def setup(self):
     #     print 'Channel List'
     #     print self.backend.channels
@@ -136,16 +142,43 @@ class WebChannel(Resource):
     def __init__(self, channel):
         Resource.__init__(self)
         self.channel = channel
+        self.putChild('episodes',WebChannelEpisodes(self.channel))
 
     def render_GET(self,request):
-        print self.channel.config['channels']
-        for outlet in self.channel.config['channels'][self.channel.name]['outlets']:
-            print outlet
-        return jsonResponse({'episodes':self.channel.episodes, 'qualities': None})
+        jsondata = {}
+        jsondata['name'] = self.channel.name
+        jsondata['slug'] = self.channel.slug
+        jsondata['url'] = self.channel.url
+        # jsondata['episodes'] = []
+        # for episodeid in self.channel.episodes.keys():
+        #     episodedata = {}
+        #     episodedata['id'] = episodeid
+        #     episodedata['name'] = self.channel.episodes[episodeid].name
+        #     jsondata['episodes'].append(episodedata)
+        return jsonResponse(jsondata)
+        # return jsonResponse({'episodes':self.channel.episodes, 'qualities': None})
 
     def render_POST(self,request):
         # self.channel.
         return jsonResponse({'id':1})
+
+class WebChannelEpisodes(Resource):
+    """docstring for WebChannelEpisodes"""
+    def __init__(self, channel):
+        Resource.__init__(self)
+        self.channel = channel
+
+    def render_GET(self,request):
+        jsondata = []
+        for episodeid in self.channel.episodes.keys():
+            episodedata = {}
+            episodedata['id'] = episodeid
+            episodedata['name'] = self.channel.episodes[episodeid].name
+            episodedata['starttime'] = self.channel.episodes[episodeid].starttime
+            episodedata['endtime'] = self.channel.episodes[episodeid].endtime
+            jsondata.append(episodedata)
+        return jsonResponse(jsondata)
+        
 
                        
         
