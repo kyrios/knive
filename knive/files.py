@@ -34,6 +34,7 @@ import  foundation
 class FileWriter(KNOutlet):
     """Write data received from self.inlet to file specified during init"""
     def __init__(self, outdir, filename = 'Unknown-knive-file',keepFiles=5, suffix=None):
+        super(FileWriter,self).__init__(name='FileWriter')
         self.outfile = None
         if os.path.exists(outdir):
             self.outdir = outdir
@@ -47,8 +48,6 @@ class FileWriter(KNOutlet):
         
     def getFileName(self):
         """Return the filename this fileWriter will write as soon as the service starts"""
-        if self.parent:
-            self.filename = self.parent.getFileName()
         if self.suffix:
             self.filename = self.filename + self.suffix
         self._outfileName = self.outdir + os.path.sep + self.filename
@@ -82,6 +81,9 @@ class FileWriter(KNOutlet):
             if self.running:
                 reactor.callLater(5,syncToDisc)
         syncToDisc()
+
+    def _start(self):
+        self.startService()
         
     def stopService(self):
         """docstring for stopService"""
@@ -90,15 +92,12 @@ class FileWriter(KNOutlet):
         
     def dataReceived(self,data):
         """docstring for writeData"""
+        print "data received %s" % len(data)
         fdesc.writeToFD(self.outfile,data)
     
     def writeData(self,data):
         """docstring for writeData"""
         fdesc.writeToFD(self.outfile,data)
-        
-    def setParent(self,parent):
-        """docstring for setParent"""
-        self.parent = parent
 
       
     def __str__(self):

@@ -28,6 +28,7 @@
 """
 
 from foundation import KNDistributor
+from exceptions import AlreadyRecording
 
 class Channel(KNDistributor):
     """A channel (also called Stream or Show) is the central element. For example a podcast project or a room at a conference is a channel.
@@ -39,26 +40,47 @@ class Channel(KNDistributor):
             name: The name of this channel. Example: "Bits und so"
         
         Kwargs:
-            slug: A short name for this channel. AlphaNumeric. The slug is used for stuff like filenames. Example: "bus"
+            slug: A short name for this channel. AlphaNumeric. The slug is used for stuff like filenames and in. Example: "bus"
             url: The website where more information about this channel can be found
         """
 
         super(Channel, self).__init__(name=name)
         self.config = configObj
-        self.episodes = []
-        """List of episodes/recordings"""
+        self.episodes = {}
+        """Dictionary of episodes/recordings."""
         self.slug = slug
         self.url = url
 
         self._recording = False
         self._lastRecording = None
 
+    def _getNewEpisodeId(self):
+        """Return a new unique episode Id"""
+        newKey = None
+        while True:
+            newKey = random.randint(1,10000)
+            if newKey not in self.episodes.keys():
+                return newKey
+
     def __str__(self):
         return "%s/%s (%s) %s episodes" % (self.slug,self.name,self.url,len(self.episodes))
 
 
-    def startRecording(self):
-        """Starts a recording of the stream. Return an episode object if recording started."""
+    def createEpisode(self,episodeId=None):
+        episode = None
+        if not episodeId:
+            episodeId = self._getNewEpisodeId()
+            episode = Episode(self,episodeId)
+        else:
+            if episodeId not in self.episodes.keys():
+                episode = Episode(self,episodeId)
+            else:
+                raise Exception('Can not create new Episode. Key alredy in use.')
+
+
+
+    def startRecording(self,episode=None):
+        """Starts a recording of the stream. If no episode is supplied one is created"""
         if not self._recording:
             self._recording = True
             episode = Episode()
@@ -68,8 +90,11 @@ class Channel(KNDistributor):
                 if IKNRecorder.providedBy(outlet):
                     outlet.startRecording()
             return episode
+        else:
+            raise AlreadyRecording
 
-    def stopRecording(self):
+
+    def stopRecording(self,episode):
         """Stops a running recording."""
         if self._recording:
             self._recording = False

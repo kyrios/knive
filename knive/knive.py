@@ -59,6 +59,7 @@ class Knive(service.MultiService):
         service.MultiService.stopService()
 
     def createChannelFromConfig(self,configObject):
+        print configObject
         channel = Channel(configObject['name'],self.config)
         channel.slug = configObject['slug']            
         channel.url = configObject['url']
@@ -85,7 +86,7 @@ class Knive(service.MultiService):
             outletConfig = configObject['outlets'][outletsectionname]
             if outletConfig['type'] == 'HTTPLive': 
                 try:
-                    httplivestream = HTTPLiveStream(channel=channel,destdir=outletConfig['outputLocation'],publishURL=outletConfig['publishURL'])
+                    httplivestream = HTTPLiveStream(channel=channel,destdir=self.config['paths']['knivedata'],publishURL=outletConfig['publishURL'])
                     channel.addOutlet(httplivestream)
                 except Exception, err:
                     logging.exception(err)

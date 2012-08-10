@@ -15,6 +15,7 @@
 [paths]
 ffmpegbin = string(default=/usr/bin/ffmpeg)
 segmenterbin = string(default=/usr/local/bin/live_segmenter)
+knivedata = string(default=/var/www/knive)
 
 [logging]
 logfile = string(default=./knive.log)
@@ -29,14 +30,13 @@ port=integer(min=1024,max=65000,default=8000)
 [channels]
     [[__many__]]
     name=string(min=3,max=30)
-    slug=string(min=3,max=30)
     url=string(min=3,max=100,default='http://example.com')
 
     [[[outlets]]]
         [[[[__many__]]]]
         type=option('HTTPLive','FileArchiver')
         publishURL=string
-        outputLocation=string
+        outputLocation=string(default='httplive')
             [[[[[__many__]]]]]
             vcodec=string(default=None)
             acodec=string(default=None)

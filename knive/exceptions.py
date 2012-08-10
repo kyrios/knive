@@ -38,5 +38,11 @@ class ServiceRunningWithoutOutlets(Exception):
     """Raised when an IKNInlet is started without valid IKNOutlets to send data to."""
     def something():
         pass
+
+class AlreadyRecording(Exception):
+    """Raised when an already running recording is tried to start again."""
+    def something():
+        pass
+        
         
         
