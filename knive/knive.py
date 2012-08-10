@@ -21,9 +21,13 @@ from kninterfaces   import IKNInlet
 from twisted.application        import service
 from twisted.python.log         import *
 
+# from twisted.application import service
 
 class Knive(service.MultiService):
     """A single service to rule them all. Singleton object for startup and stop of services."""
+
+    def timoStart(self):
+        self.channels[0].startEpisode()
     
     def __init__(self, configFile):
         service.MultiService.__init__(self)
@@ -31,8 +35,15 @@ class Knive(service.MultiService):
         self.config = None
         self.log = logging.getLogger('Knive')
         self.loadConfig()
-        
         self.channels = []
+        
+        # from twisted.conch import manhole_tap
+        # manhole_tap.makeService({"telnetPort": None,
+        #                  "sshPort": "tcp:22101",
+        #                  "namespace": {"channels": self.channels},
+        #                  "passwd": "passwd"}).setServiceParent(application)
+        
+        
         """List of available channels."""
 
     def printOutlets(self,object,t=2,r=1):
@@ -60,8 +71,7 @@ class Knive(service.MultiService):
 
     def createChannelFromConfig(self,configObject):
         print configObject
-        channel = Channel(configObject['name'],self.config)
-        channel.slug = configObject['slug']            
+        channel = Channel(configObject['name'],self.config,configObject['slug'] )
         channel.url = configObject['url']
 
         
@@ -86,7 +96,7 @@ class Knive(service.MultiService):
             outletConfig = configObject['outlets'][outletsectionname]
             if outletConfig['type'] == 'HTTPLive': 
                 try:
-                    httplivestream = HTTPLiveStream(channel=channel,destdir=self.config['paths']['knivedata'],publishURL=outletConfig['publishURL'])
+                    httplivestream = HTTPLiveStream(channel=channel,destdir=self.config['paths']['knivedata'],segmentServer=outletConfig['segmentServer'])
                     channel.addOutlet(httplivestream)
                 except Exception, err:
                     logging.exception(err)

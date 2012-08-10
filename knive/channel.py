@@ -28,13 +28,18 @@
 """
 
 from foundation import KNDistributor
-from exceptions import AlreadyRecording
+from exceptions import AlreadyRecording, NoRecording
+from episode    import Episode
+from  kninterfaces import IKNRecorder
+
+import sys, os
+import time
 
 class Channel(KNDistributor):
     """A channel (also called Stream or Show) is the central element. For example a podcast project or a room at a conference is a channel.
     Think in broadcast channels. One channel can only stream one thing at a time."""
 
-    def __init__(self,name,configObj,slug=None,url=None):
+    def __init__(self,name,configObj,slug,url=None):
         """
         Args:
             name: The name of this channel. Example: "Bits und so"
@@ -50,60 +55,73 @@ class Channel(KNDistributor):
         """Dictionary of episodes/recordings."""
         self.slug = slug
         self.url = url
-
+        self.currentEpisode = None
         self._recording = False
         self._lastRecording = None
+        self.destinationDirectory = self.config['paths']['knivedata'] + os.path.sep + self.slug
+        if os.path.exists(self.destinationDirectory):
+            self.log.debug("Will create files in '%s'" % self.destinationDirectory)
+        else:
+            try:
+                os.mkdir(self.destinationDirectory)
+            except:
+                raise
 
-    def _getNewEpisodeId(self):
-        """Return a new unique episode Id"""
-        newKey = None
-        while True:
-            newKey = random.randint(1,10000)
-            if newKey not in self.episodes.keys():
-                return newKey
 
     def __str__(self):
         return "%s/%s (%s) %s episodes" % (self.slug,self.name,self.url,len(self.episodes))
 
 
-    def createEpisode(self,episodeId=None):
-        episode = None
-        if not episodeId:
-            episodeId = self._getNewEpisodeId()
-            episode = Episode(self,episodeId)
-        else:
-            if episodeId not in self.episodes.keys():
-                episode = Episode(self,episodeId)
-            else:
-                raise Exception('Can not create new Episode. Key alredy in use.')
-
-
-
-    def startRecording(self,episode=None):
-        """Starts a recording of the stream. If no episode is supplied one is created"""
+    def startEpisode(self,record=True):
+        """Everything is an episode in knive. Want to start broadcasting? Start Episode!
+        Kwargs:
+        record: BOOL. Make the episode persistant. (e.g. HTTP Live Streams will provide a ReLive)
+        """
         if not self._recording:
             self._recording = True
-            episode = Episode()
-            self.episodes.append(episode)
-            episode.start()
-            for outlet in self.outlets:
-                if IKNRecorder.providedBy(outlet):
-                    outlet.startRecording()
-            return episode
+            episodeId = self._getNewEpisodeId()
+            self.currentEpisode = Episode(self,episodeId)
+            self.episodes[episodeId] = self.currentEpisode
+            self.currentEpisode.start()
+            if record:
+                for outlet in self.outlets:
+                    if IKNRecorder.providedBy(outlet):
+                        print outlet
+                        outlet.startRecording(self.currentEpisode)
+            # else:
+            #     for outlet in self.outlets:
+            #         outlet.start
+            linkTarget = self.currentEpisode.destinationDirectory
+            linkName = self.destinationDirectory + os.path.sep + 'latest'
+
+            if(os.path.exists(linkName)):
+                os.unlink(linkName)
+            os.symlink(linkTarget, linkName)
+
+            return self.currentEpisode
         else:
             raise AlreadyRecording
 
 
-    def stopRecording(self,episode):
+    def stopEpisode(self,episode=None):
         """Stops a running recording."""
+        if episode is None:
+            episode = self.currentEpisode
         if self._recording:
             self._recording = False
             for outlet in self.outlets:
                 if IKNRecorder.providedBy(outlet):
                     outlet.stopRecording()
-            self.episodes[-1].stop()
+            episode.stop()
+        else:
+            raise NoRecording
 
 
     def getMetadataAsJson(self):
         pass
 
+
+
+    def _getNewEpisodeId(self):
+        """Return a new unique episode Id"""
+        return time.strftime('%Y-%m-%d_%H-%M-%S')

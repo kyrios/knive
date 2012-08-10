@@ -14,10 +14,13 @@ import logging
 import datetime
 import time
 import string
+import random
+import sha
 
 from twisted.internet       import reactor
-# from zope.interface import implements
-# from kninterfaces           import IKNOutlet
+from zope.interface import implements
+from kninterfaces           import IKNRecorder
+from collections    import deque
 
 from foundation import KNDistributor, KNOutlet, KNProcessProtocol
 from ffmpeg     import FFMpeg
@@ -35,9 +38,10 @@ class HTTPLiveStream(KNDistributor):
 
     Extends :class:`KNDistributor`
     """
+    implements(IKNRecorder)
     
     
-    def __init__(self,name='Unknown',destdir=None,channel=None,publishURL=None,lastIndex=1):
+    def __init__(self,name='Unknown',destdir=None,channel=None,segmentServer=None,lastIndex=1):
         """
         Kwargs:
         name: Name of the stream. (Set by channel.name if not set and channel available)
@@ -47,13 +51,14 @@ class HTTPLiveStream(KNDistributor):
         lastIndex: The "biggest" index currently used by all variant streams. 
         """
         self.name = name
+        self.channel = channel
         """name of the stream"""
         if channel.name and name == 'Unknown':
             self.name = channel.name
         super(HTTPLiveStream, self).__init__(name=self.name) # Call this after we have a name.
 
-        self.publishURL = publishURL
-        """The URL the stream will be available at."""
+        self.segmentServer = segmentServer
+        """The URL where ts files will be available at."""
 
         self.lastIndex = lastIndex
         """This is the index of the first index in a resulting new M3U8 file. 
@@ -76,6 +81,12 @@ class HTTPLiveStream(KNDistributor):
             raise Exception('destdir can not be none.')
         self.setDestdir(destdir)
 
+
+        self.segmentIndex = {}
+        """Stores random numbers per segment"""
+
+        self.episode = None
+
     def createQuality(self,name,config,ffmpegbin=None):
         """
         Create a new :class:`HTTPLiveVariantStream` object and add it to self.qualities.
@@ -90,7 +101,8 @@ class HTTPLiveStream(KNDistributor):
         """
 
         self.log.info('Creating new HTTPLiveVariantStream: %s' % name)
-        httpliveStreamvariant = HTTPLiveVariantStream(name,config,ffmpegbin=ffmpegbin,destdir=self._destdir + os.path.sep + name)
+        variantDir = self._destdir + os.path.sep + name
+        httpliveStreamvariant = HTTPLiveVariantStream(name,config,ffmpegbin=ffmpegbin,destdir = variantDir)
         self.addQuality(httpliveStreamvariant)
         return httpliveStreamvariant
 
@@ -120,11 +132,70 @@ class HTTPLiveStream(KNDistributor):
             if(createDir):
                 try:
                     os.mkdir(destdir)
-                    self.setDestdir(destdir)
                 except:
                     raise
             else:
                 raise Exception("Directory does not exist %s" % destdir)
+
+
+    def startRecording(self,episode,autoStop=None):
+        """Start the recording of received data.
+        Arguments:
+        episode: The current episode that is to be recorded. Register this recording with the episode by calling episode.register(IKNRecording-instance)
+        Keyword Arguments:
+        autoStop: Automatically stop this recording in x seconds
+        Returns:
+        On success an IKNRecording object is returned.
+        """
+        self.episode = episode
+        self.setDestdir(episode.destinationDirectory + os.path.sep + 'httplive',True)
+        self.segmentDir = []
+
+        for outlet in self.outlets:
+            outlet.setDestdir(self._destdir + os.path.sep + outlet.name)
+            outlet.startRecording()
+        self.writeVariantsM3U8()
+
+    def stopRecording(self):
+        """Stop the recording process."""
+        self.log.debug('Stopping')
+        for outlet in self.outlets:
+            outlet.stopRecording()
+
+
+    def writeVariantsM3U8(self):
+        fd, m3u8tmpfilename = tempfile.mkstemp(suffix=".static.m3u8")
+        fd2, m3u8tmpphpfilename = tempfile.mkstemp(suffix=".m3u8")
+        m3u8tmp = os.fdopen(fd, "w+b")
+        m3u8tmpphp = os.fdopen(fd2, "w+b")
+        os.fchmod(fd,0664)
+        os.fchmod(fd2,0664)
+        m3u8tmpphp.write("<?php include('../../../userscript.php'); header('Content-type: application/vnd.apple.mpegurl')?>\n")
+        m3u8tmp.write("#EXTM3U\n")
+        m3u8tmpphp.write("#EXTM3U\n")
+        m3u8tmp.write("#EXT-X-VERSION:3\n")
+        m3u8tmpphp.write("#EXT-X-VERSION:3\n")
+        for quality in self.outlets:
+            if quality.getResolution() is not None:
+                m3u8tmp.write('#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=%s,CODECS="%s",RESOLUTION=%s\n' % (quality.getMaxBandwidth(),quality.getCodecs(),quality.getResolution()))
+                m3u8tmpphp.write('#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=%s,CODECS="%s",RESOLUTION=%s\n' % (quality.getMaxBandwidth(),quality.getCodecs(),quality.getResolution()))
+            else:
+                m3u8tmp.write('#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=%s,CODECS="%s"\n' % (quality.getMaxBandwidth(),quality.getCodecs()))
+                m3u8tmpphp.write('#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=%s,CODECS="%s"\n' % (quality.getMaxBandwidth(),quality.getCodecs()))
+
+            m3u8tmpphp.write("<?php user1('%s/stream.m3u8');?>\n" % quality.name)
+            m3u8tmp.write("%s/stream.m3u8\n" % quality.name)
+
+        m3u8tmp.close()
+        m3u8tmpphp.close()
+        destfile = "%s%s%s.static.m3u8" % (self._destdir,os.path.sep,self.channel.slug)
+        destfile2 = "%s%s%s.m3u8" % (self._destdir,os.path.sep,self.channel.slug)
+        self.log.debug("Moving %s to %s" % (m3u8tmpfilename,destfile))
+        self.log.debug("Moving %s to %s" % (m3u8tmpphpfilename,destfile2))
+        shutil.move(m3u8tmpfilename,destfile)
+        shutil.move(m3u8tmpphpfilename,destfile2)
+
+        reactor.callLater(30,self.writeVariantsM3U8)
 
 class HTTPLiveVariantStream(KNDistributor):
     """Encode an input mpegts stream to the desired quality and segment the stream to chunks"""
@@ -148,51 +219,96 @@ class HTTPLiveVariantStream(KNDistributor):
         self.segmenter = None
         """The :class:`HTTPLiveSegmenter` object used for segmenting"""
 
-        self.destinationDirectory = None
+        # self.destinationDirectory = None
         self.setDestdir(destdir)
+        self.destinationDirectory = None
         # Set up the encoder
         if ffmpegbin:
             self.encoder = FFMpeg(ffmpegbin=ffmpegbin,encoderArguments=encoderArguments)
         else:
             self.encoder = FFMpeg(encoderArguments=encoderArguments)
 
-        self.segmenter = HTTPLiveSegmenter(name=self.name+"_segmenter",destdir=self.destinationDirectory)
+        self.segmenter = HTTPLiveSegmenter(self,name=self.name+"_segmenter",destdir=self.destinationDirectory)
 
         # Hook everything up
         self.addOutlet(self.encoder)
         self.encoder.addOutlet(self.segmenter)
+        self.encoderArguments = encoderArguments
+
+
+        self.filesizes = deque(10*[100000],10)
 
     def willStart(self):
         config = self._findObjectInInletChainOfClass(knive.Knive).config
         self.segmenter.segmenterbin = config['paths']['segmenterbin']
 
         
-    def setDestdir(self,destdir,createDir=False):
+    def setDestdir(self,destdir,createDir=True):
         """Set the location where files will be saved to destdir.
 
         Args:
             createDir: (bool) Create the directory if it doesn't exist already. Else throws an exception.
         """
-
-        self.log.debug("Settings destinationDirectory to %s" % destdir)
-        destdir = os.path.abspath(destdir)
-        if os.path.exists(destdir):
+        if destdir is None:
             self.destinationDirectory = destdir
-            self.log.debug("Will create files in '%s'" % self.destinationDirectory)
         else:
-            if(createDir):
-                try:
-                    os.mkdir(destdir)
-                    self.setDestdir(destdir)
-                except:
-                    raise
+            try:
+                self.segmenter.lastFile = False
+            except AttributeError:
+                pass
+            self.log.debug("Setting destinationDirectory to %s" % destdir)
+            destdir = os.path.abspath(destdir)
+            if os.path.exists(destdir):
+                self.destinationDirectory = destdir
+                self.log.debug("Will create files in '%s'" % self.destinationDirectory)
             else:
-                raise Exception("Directory does not exist %s" % destdir)
+                if(createDir):
+                    try:
+                        os.mkdir(destdir)
+                        self.setDestdir(destdir)
+                    except:
+                        raise
+                else:
+                    raise Exception("Directory does not exist %s" % destdir)
+
+    def startRecording(self):
+        self.segmenter.startRecording()
+
+    def stopRecording(self):
+        self.log.debug('Stopping')
+        self.segmenter.stopRecording()
+
+    def getAverageQuality(self):
+        totsize = 0
+        for size in self.filesizes:
+            totsize = totsize + size
+        return int(totsize/10*8)
+
+    def getMaxBandwidth(self):
+        rate = self.encoderArguments['maxrate']
+        return int(rate[:-1]) * 1024
+
+    def updateBandwidthAverage(self,size):
+        self.filesizes.appendleft(size)
+
+    def getResolution(self):
+        res = None
+        try:
+            res = self.encoderArguments['s']
+        except KeyError:
+            pass
+        return res
+
+    def getCodecs(self):
+        if(isinstance(self.encoderArguments['codecstring'],list)):
+            return ",".join(self.encoderArguments['codecstring'])
+        else:
+            return self.encoderArguments['codecstring']
 
 
 class HTTPLiveSegmenter(KNOutlet):
     """Cuts mpeg-ts streams in chunks and creates index files."""
-    def __init__(self,name="Unknown segmenter",segmenterbin=None,destdir=None,tempdir=None):
+    def __init__(self,variant, name="Unknown segmenter",segmenterbin=None,destdir=None,tempdir=None):
         """
         Kwargs:
             name: Name of this segmenter.
@@ -202,8 +318,11 @@ class HTTPLiveSegmenter(KNOutlet):
         """
 
         super(HTTPLiveSegmenter, self).__init__(name=name)
+        self.variant = variant
         self.name = name
         """Name of this segmenter"""
+
+        self.lastFile = False
 
         self.segmenterbin = None
         if segmenterbin:
@@ -216,10 +335,6 @@ class HTTPLiveSegmenter(KNOutlet):
         self.httpStream = None
         """The :class:`HTTPLiveStream` this segmenter belongs to. This is determined automatially."""
 
-        
-
-        self._destinationDirectory = destdir
-
         if tempdir is None:
             self._tempdir = tempfile.gettempdir()
         else:
@@ -227,8 +342,6 @@ class HTTPLiveSegmenter(KNOutlet):
 
         self._protocol = SegmenterProtocol()
         self._protocol.factory = self
-
-
         
     def _start(self):
         """All preparations done. Start the process"""
@@ -246,8 +359,7 @@ class HTTPLiveSegmenter(KNOutlet):
         filePrefix = ''.join(c for c in filePrefix if c in valid_chars)
         self.log.debug("FilePrefix: '%s'" % filePrefix)
 
-
-        self.m3u8 = HTTPLiveStreamM3U8(self._destinationDirectory,self)
+        self.m3u8 = HTTPLiveStreamM3U8(self.variant)
         
         args = ["live_segmenter","10",self._tempdir,filePrefix,filePrefix]
         self.cmdline = "%s %s" % (self.segmenterbin, " ".join(args))
@@ -260,6 +372,10 @@ class HTTPLiveSegmenter(KNOutlet):
         else:
             raise OSError(2, 'No such file or directory', segmenterbin)
 
+    def startRecording(self):
+        urlPrefix = "%s/%s/%s/httplive/%s" % (self.httpStream.segmentServer,self.httpStream.channel.slug,self.httpStream.episode.name,self.variant.name)
+        self.m3u8.urlPrefix = urlPrefix
+
     def dataReceived(self,data):
         """Data received from our inlet. Pipe this data to the ffmpeg process"""
         if not self.running:
@@ -271,16 +387,37 @@ class HTTPLiveSegmenter(KNOutlet):
         """A segment is ready for transfer"""
         #umts-00000001.ts
         duration = float(duration)
+        liveStreamObj = self.variant._findObjectInInletChainOfClass(HTTPLiveStream)
+
+        try:
+            if liveStreamObj.episode.starttime is not None:
+                isRecording = True
+        except:
+            pass
         
         self.httpStream.setLastIndex(int(lastindex))
         filename = "%s-%08d.ts" % (encodingprofile,int(lastindex))
         sourcefile = os.path.abspath("%s%s%s" % (self._tempdir,os.path.sep,filename))
-        destfile = os.path.abspath("%s%s%s" % (self._destinationDirectory,os.path.sep,self.m3u8.addSegment(duration)))
-        self.log.debug("Moving file %s to %s" % (sourcefile,destfile))
+        self.variant.updateBandwidthAverage(os.stat(sourcefile).st_size/duration)
         
-        #FIXME: This is propably a blocking call!
-        shutil.move(sourcefile,destfile)
-        self.m3u8.writeIndexFile()
+        if self.variant.destinationDirectory is None:
+            # Delete files
+            os.unlink(sourcefile)
+        else:
+            destfile = os.path.abspath("%s%s%s" % (self.variant.destinationDirectory,os.path.sep,self.m3u8.addSegment(duration)))
+            self.log.debug("Moving file %s to %s" % (sourcefile,destfile))
+            
+            #FIXME: This is propably a blocking call!
+            shutil.move(sourcefile,destfile)
+            self.m3u8.writeIndexFile(isRecording=isRecording,isLast=self.lastFile)
+            if self.lastFile:
+                self.variant.setDestdir(None)
+                self.m3u8.emptySegmentList()
+
+    def stopRecording(self):
+        self.log.debug('Stopping')
+        self.lastFile = True
+
 
 class SegmenterProtocol(KNProcessProtocol):
     factory = None
@@ -303,9 +440,8 @@ class SegmenterProtocol(KNProcessProtocol):
 
 class HTTPLiveStreamM3U8(object):
     """Representation of a HTTPLive Stream indexfile"""
-    def __init__(self, dstPath, httplivestreamvariant, startIndex=1, maxSegments=10, urlPrefix=None, filename="stream.m3u8", segmentLength=10, segmentPrefix="s", allowCache=False,version=3,extKey=None,datetime=datetime.time()):
+    def __init__(self, httplivestreamvariant, startIndex=1, maxSegments=10, urlPrefix=None, filename="stream.m3u8", segmentLength=10, segmentPrefix="s", allowCache=False,version=3,extKey=None,datetime=datetime.time()):
         super(HTTPLiveStreamM3U8, self).__init__()
-        self.dstPath = dstPath
         self.httplivestreamvariant = httplivestreamvariant
         self.filename = filename
         self.segmentLength = segmentLength
@@ -324,6 +460,9 @@ class HTTPLiveStreamM3U8(object):
         self.logger = logging.getLogger('[%s]' % (self.__class__.__name__))
 
         self.segments = []
+
+    def emptySegmentList(self):
+        self.segments = []
         
     def setParent(self,parent):
         """set self.parent and also inherit the lastIndex"""
@@ -334,15 +473,24 @@ class HTTPLiveStreamM3U8(object):
         self.segmenttitle = self.httplivestreamvariant._findObjectInInletChainOfClass(Channel).name
         
     def addSegment(self,segmentLength=10):
-        """Add a segment to the stream and return the filename of the the segment"""
-        segmentName = "%s-%d.ts" % (self.segmentPrefix, self.lastIndex)
+        """Add a segment to the stream and return the filename of the segment"""
+        httpLiveStreamObj = self.httplivestreamvariant._findObjectInInletChainOfClass(HTTPLiveStream)
+        try:
+            segmentSeed = httpLiveStreamObj.segmentIndex[self.lastIndex]
+        except KeyError:
+            segmentSeed = random.randint(1,10000)
+            httpLiveStreamObj.segmentIndex[self.lastIndex] = segmentSeed
+        segmentName = "%s-%s-%d" % (self.segmentPrefix, segmentSeed , self.lastIndex)
+        segmentName = "%s.ts" % segmentName
+        # segmentName = "%s.ts" % sha.sha(segmentName).hexdigest()
+
         segment = HTTPLiveStreamSegment(self.lastIndex,segmentName,self.segmentLength,time.time())
         self.logger.debug("Segment name: %s Segment Length: %.1f Segment Time: %s " % (segment,float(segment.length),segment.iso8601()))
         self.segments.append(segment)
         self.lastIndex += 1
         return(segment)
         
-    def writeIndexFile(self):
+    def writeIndexFile(self,isRecording=False,isLast=False):
         """Write a current representation of the object to a file in self.dstPath + self.filename"""
         
         fd, m3u8tmpfilename = tempfile.mkstemp(suffix=".m3u8")
@@ -369,23 +517,36 @@ class HTTPLiveStreamM3U8(object):
         # else:
         #     mediasequence = self.startIndex
         mediasequence = 1
-        mediasequence = self.lastIndex - 3
+        # mediasequence = self.lastIndex - 3
         
         if(mediasequence < 1):
             mediasequence = 1
-        m3u8tmp.write("#EXT-X-MEDIA-SEQUENCE:%d\n" % int(mediasequence))
-        
-        
-        for segment in self.segments[(self.maxSegments*-1):]:
-            m3u8tmp.write("#EXT-X-PROGRAM-DATE-TIME:%s\n" % (segment.iso8601()))
+        # m3u8tmp.write("#EXT-X-MEDIA-SEQUENCE:%d\n" % int(mediasequence))
+
+        def _writeLine(segment):
+            # m3u8tmp.write("#EXT-X-PROGRAM-DATE-TIME:%s\n" % (segment.iso8601()))
             m3u8tmp.write("#EXTINF:%0.2f,%s\n" % (float(segment.length), self.segmenttitle))
             if self.urlPrefix is not None:
                 m3u8tmp.write("%s/" % self.urlPrefix)
             m3u8tmp.write("%s\n" % (segment.filename))
         
+        if isRecording:
+            if isLast:
+               for segment in self.segments:
+                _writeLine(segment)
+            else: 
+                for segment in self.segments[:-2]:
+                    _writeLine(segment)
+        else:
+            for segment in self.segments[(self.maxSegments*-1):-2]:
+                _writeLine(segment)
+
+        if isLast:
+            m3u8tmp.write('#EXT-X-ENDLIST\n')
+        
         
         m3u8tmp.close()
-        destfile = "%s%s%s" % (self.dstPath,os.path.sep,self.filename)
+        destfile = "%s%s%s" % (self.httplivestreamvariant.destinationDirectory,os.path.sep,self.filename)
         self.logger.debug("Moving %s to %s" % (m3u8tmpfilename,destfile))
         shutil.move(m3u8tmpfilename,destfile)
         ##EXTM3U
@@ -393,7 +554,7 @@ class HTTPLiveStreamM3U8(object):
         #EXT-X-MEDIA-SEQUENCE:0
         #EXTINF:7,    
         #fileSequence0.ts
-        #EXT-X-ENDLIST
+        
 
 
 class HTTPLiveStreamSegment(object):

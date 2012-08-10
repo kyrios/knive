@@ -93,16 +93,17 @@ for channelSection in knive.config['channels']:
     channel = knive.createChannelFromConfig(knive.config['channels'][channelSection])
 
 
-manholenamespace = {'knive': knive}
-manholeOptions = {
-    'namespace' : manholenamespace,
-    'passwd' : 'users.txt',
-    'sshPort': '4022',
-    'telnetPort': None
-}
+if knive.config['manhole']['enabled']:
+    manholenamespace = {'knive': knive}
+    manholeOptions = {
+        'namespace' : manholenamespace,
+        'passwd' : 'users.txt',
+        'sshPort': knive.config['manhole']['port'],
+        'telnetPort': None
+    }
 
-manHoleService = makeManholeService(manholeOptions)
-manHoleService.setServiceParent(knive)
+    manHoleService = makeManholeService(manholeOptions)
+    manHoleService.setServiceParent(knive)
 
 
 knive.startService()

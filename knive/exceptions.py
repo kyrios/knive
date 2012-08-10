@@ -43,6 +43,12 @@ class AlreadyRecording(Exception):
     """Raised when an already running recording is tried to start again."""
     def something():
         pass
+
+class NoRecording(Exception):
+    """Raised when trying to stop a not running episode."""
+    def something():
+        pass
+        
         
         
         

@@ -37,7 +37,9 @@ class FFMpeg(KNDistributor):
         self.protocol = FFMpegProtocol()
         self.protocol.factory = self
         self.ffmpegbin = ffmpegbin
-        self.encoderArguments = encoderArguments
+
+        self.encoderArguments = dict(encoderArguments)
+        del self.encoderArguments['codecstring']
 
         self._targetFPS = 25
         try:
@@ -83,15 +85,17 @@ class FFMpegProtocol(KNProcessProtocol):
     # Output matching
     REversion = re.compile('FFmpeg version')
     #frame=97 fps= 21 q=30.0 size=     443kB time=2.32 bitrate=1564.3kbits/s dup=12 drop=0 
+    #frame=   64 fps=0.0 q=32.0 size=      19kB time=00:00:00.84 bitrate= 186.2kbits/s dup=13 drop=47
+
     REencodingStats = re.compile('frame=\s*(\d+)\s*fps')
-    REencodingStatsFPS = re.compile('fps=\s*(\d+)\s*q')
+    REencodingStatsFPS = re.compile('fps=\s*(\d+\.?\d?)\s*q')
     #size=     560kB time=64.91 bitrate=  70.7kbits/s
     REencodingStatsAudio = re.compile('size= *(\d+)kB *time=\d+')
     
     
     def errReceived(self, data):
         lines = str(data).splitlines()
-        log.msg(data)
+        # log.msg(data)
         for line in lines:
             self._lastlogline = line
             if(self.__class__.REversion.match(line)):
@@ -107,10 +111,10 @@ class FFMpegProtocol(KNProcessProtocol):
 
     def updateStats(self,line):
         match = self.__class__.REencodingStatsFPS.search(line)
-        self.currentFPS = int(match.group(1))
+        self.currentFPS = float(match.group(1))
         #log.msg("Current FPS: %s Target FPS: %s " % (self.currentFPS,self.factory.targetFPS))
-        if self.currentFPS < self.factory._targetFPS:
-            log.msg("WARNING! Current encoding FPS (%s) below target FPS (%s) Not encoding fast enough! Reduce encoding quality!" % (self.currentFPS,self.factory._targetFPS))
+        if int(self.currentFPS) < int(self.factory._targetFPS):
+            log.msg("WARNING! Current encoding FPS (%s) below target FPS (%s) Not encoding fast enough! Reduce encoding quality!" % (int(self.currentFPS),self.factory._targetFPS))
     
     def outReceived(self, data):
         """Received data from ffmpegs STDOUT"""

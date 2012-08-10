@@ -93,9 +93,9 @@ class IKNRecorder(IKNOutlet):
     def stopRecording():
         """Stop the recording process."""
 
-class IKNRecording(Interface):
-    """A recording stores information that is specific for a stream and single moment in time. An episode object is assigned to this recording."""
-    episode = Attribute("""Episode object this recording belongs to""")
+# class IKNRecording(Interface):
+#     """A recording stores information that is specific for a stream and single moment in time. An episode object is assigned to this recording."""
+#     episode = Attribute("""Episode object this recording belongs to""")
 
 
 

@@ -35,7 +35,7 @@ port=integer(min=1024,max=65000,default=8000)
     [[[outlets]]]
         [[[[__many__]]]]
         type=option('HTTPLive','FileArchiver')
-        publishURL=string
+        segmentServer=string
         outputLocation=string(default='httplive')
             [[[[[__many__]]]]]
             vcodec=string(default=None)

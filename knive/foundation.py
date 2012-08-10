@@ -224,7 +224,7 @@ class KNOutlet(KNStreamObject):
         Returns: 
             the first matching instance or None if None is found.
         """
-        self.log.debug('Searching %s' % searchedClass)
+        # self.log.debug('Searching %s' % searchedClass)
         
         if(isinstance(self.inlet,searchedClass)):
             return self.inlet
