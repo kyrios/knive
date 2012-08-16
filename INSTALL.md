@@ -22,6 +22,7 @@ OS independent notes
 * pyasn1 (For manhole service)
 
 Hint:
+    
     sudo easy_install pycrypto pyasn1
 
 
@@ -39,3 +40,5 @@ You will need to have Xcode (or at least the commandline tools) and homebrew ins
     ./configure
     make
     sudo make install
+
+Followed by configuration ...
