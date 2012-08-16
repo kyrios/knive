@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Knive by kyrios</title>
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="javascripts/respond.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <!--[if lt IE 8]>
+    <link rel="stylesheet" href="stylesheets/ie.css">
+    <![endif]-->
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+
+  </head>
+  <body>
+      <div id="header">
+        <nav>
+          <li class="fork"><a href="https://github.com/kyrios/knive">View On GitHub</a></li>
+          <li class="downloads"><a href="https://github.com/kyrios/knive/zipball/master">ZIP</a></li>
+          <li class="downloads"><a href="https://github.com/kyrios/knive/tarball/master">TAR</a></li>
+          <li class="title">DOWNLOADS</li>
+        </nav>
+      </div><!-- end header -->
+
+    <div class="wrapper">
+
+      <section>
+        <div id="title">
+          <h1>Knive</h1>
+          <p>knive - cuts live (A python/twisted HTTPLiveStreaming thing)</p>
+          <hr>
+          <span class="credits left">Project maintained by <a href="https://github.com/kyrios">kyrios</a></span>
+          <span class="credits right">Hosted on GitHub Pages &mdash; Theme by <a href="http://twitter.com/#!/michigangraham">mattgraham</a></span>
+        </div>
+
+        <h1>Knive - Cuts live</h1>
+
+<p>Knive is an audio/video streaming solution with it´s current main focus on <a href="http://tools.ietf.org/html/draft-pantos-http-live-streaming-08">HTTP Live Streaming</a>. As a fallback mp3 streaming (as seen in <a href="http://en.wikipedia.org/wiki/Icecast">icecast</a> and others) is supported.
+While the encoding, muxing and cutting is done with <a href="http://en.wikipedia.org/wiki/Ffmpeg">ffmpeg</a> most of the software is written in <a href="http://twistedmatrix.com/trac/">python/twisted</a>.</p>
+
+<p>The author(s) try to integrate ideas and formats by the <a href="http://www.podlove.org">podlove project</a>.</p>
+
+<p>Here are two typical scenarios where you might want to use knive.</p>
+
+<h3>HTTP Live Streaming support</h3>
+
+<p>Knive can be the software you want to use to support iOS devices for audio and video streaming. You already have a working RTMP server to stream live content to your visitors? Install knive and iOS devices can enjoy your content while preserving battery life and minimizing network usage.</p>
+
+<h3>Streaming &amp; Instant publishing</h3>
+
+<p>Knive is developed with the needs of podcasters in mind. While it is possible to stream audio only streams to iOS devices it will drain battery and won't work for video. Also, with HTTP Live Streaming your audience will be able to consume your show while still recording. From the beginning (timeshift).
+Your content will be available to your audience while still recording.</p>
+
+<h2>Features</h2>
+
+<ul>
+<li>Support for Blackmagic ATEM TV Studio (via atemClient)</li>
+<li>Files as input(Any encoding/container/protocol accepted by ffmpeg, h.264, ogg)</li>
+<li>Adobe Flash Media Encoder support - Capture your content and send it to the knive backend</li>
+<li>HTTP Live Streaming with ReLive/Timeshift capabilities (video on demand the second you start recording)</li>
+<li>Multiple channels/streams with one backend. (Hosting a conference? Having content from more than one source at the same time?)</li>
+</ul><h2>Status</h2>
+
+<p>The project was started in december 2011 and is currently an early alpha. While the code available on github is working it's not anywhere near for production use.
+So far the following simple workflow is working:
+Blackmagic ATEM Studio Client -&gt; atemClient -&gt; Internet -&gt; Knive Backend -&gt; HTTP Live Stream in various qualities.</p>
+
+<p>In the next weeks/month the following features will be added:</p>
+
+<ul>
+<li>Adobe Flash Media Encode as input source. Proof of concept code available. Integration with knive has to be done.</li>
+<li>Admin Interface</li>
+<li>MP3 Stream Fallback</li>
+</ul>
+      </section>
+
+    </div>
+    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
+    
+  </body>
+</html>
