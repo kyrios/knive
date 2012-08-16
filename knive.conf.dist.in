@@ -1,11 +1,11 @@
 [paths]
-ffmpegbin="/usr/local/bin/ffmpeg"
-segmenterbin="/usr/local/bin/live_segmenter"
-knivedata="./var"
+ffmpegbin="@ffmpeg_bin_path@"
+segmenterbin="@bindir@/live_segmenter"
+knivedata="@localstatedir@"
 
 [logging]
-logfile="./knive.log"
-loglevel=DEBUG
+logfile="@localstatedir@/log/knive.log"
+loglevel=INFO
 
 # Maximum filesize in kilo-kybtes
 filesize=512
@@ -13,23 +13,18 @@ filesize=512
 # Number of old files to keep
 keepfiles = 3
 
-# streams=stream0
-# stream=distributor
-# distributor=FileWriter0,HTTPLive0
-# HTTPLive0=Variant1,Variant2,Variant3
-
 [webservice]
-enabled = False
+enabled = True
 port = 9001
 
 [manhole]
 port = 22101
-enabled = True
+enabled = False
 
 [channels]
-    [[bitsundso]]
-    name = "Bits und so"
-    slug = "bus"
+    [[testshow]]
+    name = "Test Show"
+    slug = "tes"
 
         [[[source]]]
         type = kniveTCPSource
@@ -40,7 +35,7 @@ enabled = True
         [[[outlets]]]
         [[[[HTTPLive]]]]
             type=HTTPLive
-            segmentServer='http://hlsd.undsoversum.de'
+            segmentServer='http://cdn.example.com'
 
                [[[[[3G]]]]]
                 acodec=copy
@@ -96,19 +91,3 @@ enabled = True
                acodec=copy
                codecstring=mp4a.40.2
 
-
-
-
-[MEncoder]
-mplayerbin='/Applications/MPlayer OSX Extended.app/Contents/Resources/Binaries/mpextended.mpBinaries/Contents/mpextended.mpBinaries/Contents/MacOS/mplayer'
-
-
-
-
-    
-#[StreamArchiver]
-#outputdir="/var/tmp"
-#keepfiles=5
-#suffix=.ts
-## A File Name (without suffix). The special name 'auto' leads to knive trying to find a good name based on the Stream name/slug
-#filename=auto
