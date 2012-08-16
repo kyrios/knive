@@ -35,10 +35,9 @@ You will need to have Xcode (or at least the commandline tools) and homebrew ins
 * Install [XQuartz](http://xquartz.macosforge.org/landing/) - Required for ffmpeg formula
 * Install FFMpeg
 
-```brew install ffmpeg
-./configure
-make
-sudo make install
-```
+    brew install ffmpeg
+    ./configure
+    make
+    sudo make install
 
 Followed by configuration ...
