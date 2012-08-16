@@ -30,6 +30,7 @@ class WebKnive(service.Service):
          
         self.root = static.File(self.resourcepath)         
         self.root.putChild('apiV1',WebAPIV1(self.backend))
+        self.root.putChild('graph', GraphNode(self.backend))
        
         #self.wsFact = broadcast.BroadcastServerFactory("ws://localhost:9002")
         # root.putChild("doc", static.File("/usr/share/doc"))
@@ -78,7 +79,50 @@ class KniveResource(Resource):
         except AttributeError:
             pass
             
-    
+class GraphNode(KniveResource):
+
+    def render_stream(self, s):
+        return "%s\\n%s" % (s.__class__.__name__, s.name)
+
+    def render_outlets(self, stream, graph):
+        s = ""
+        if hasattr(stream, 'outlets'):
+            for o in stream.outlets:
+                s += "%s.addEdge(\"%s\", \"%s\", { directed: true });\n" % (graph, self.render_stream(stream), self.render_stream(o))
+                s += self.render_outlets(o, graph)
+        return s
+
+    def render_inlet(self, stream, graph):
+        s = ""
+        if hasattr(stream, 'inlet'):
+            s += "%s.addEdge(\"%s\", \"%s\", { directed: true });" % (graph, self.render_stream(stream.inlet), self.render_stream(stream))
+            s += self.render_inlet(stream.inlet, graph)
+        return s
+
+    def render_GET(self, request):
+        self.i = 0
+        s = "<html><head>"
+        s += "<script type=\"text/javascript\" src=\"%s\"></script>" % "http://dracula.ameisenbar.de/js/raphael-min.js"
+        s += "<script type=\"text/javascript\" src=\"%s\"></script>" % "http://dracula.ameisenbar.de/js/graffle.js"
+        s += "<script type=\"text/javascript\" src=\"%s\"></script>" % "http://dracula.ameisenbar.de/js/graph.js"
+        s += "</head><body><h1>Knive</h1><h2>Channel</h2>"
+        s += "<ul>"
+        for c in self.backend.channels:
+            s += "<li>%s" % str(c)
+            s += "<div id=\"canvas_%s\"></div></li>" % c.slug
+        s += "</ul>"
+        s += "<script type=\"text/javascript\">\nvar width = 800; var height = 600;\nwindow.onload = function() {\n"
+        for c in self.backend.channels:
+            s += "var g_%s = new Graph();\n" % c.slug
+            s += self.render_inlet(c, "g_%s" % c.slug)
+            s += self.render_outlets(c, "g_%s" % c.slug)
+            s += "var layouter_%s = new Graph.Layout.Spring(g_%s);\n" % (c.slug, c.slug)
+            s += "layouter_%s.layout();\n" % c.slug
+            s += "var renderer_%s = new Graph.Renderer.Raphael('canvas_%s', g_%s, width, height);\n" % (c.slug, c.slug, c.slug)
+            s += "renderer_%s.draw();\n" % c.slug
+        s += "};</script>"
+        s += "</body></html>"
+        return s
                 
 
 class WebRootTree(KniveResource):
@@ -100,7 +144,7 @@ class WebRootTree(KniveResource):
         return json.dumps(returnSon)
 
 class WebAPIV1(KniveResource):
-    """docstring for WebData"""
+    """docstring for WebAPIV1"""
 
     def setup(self):
         self.channels = {}

@@ -17,11 +17,19 @@ from channel    import Channel
 from tcpts      import TCPTSServer
 from httplive   import HTTPLiveStream
 from kninterfaces   import IKNInlet
+from files import FileWriter
+
+gstreamerEnabled = False
+try:
+    from gstreamer import GstInlet
+    gstreamerEnabled = True
+except Exception, e:
+    print e
+    pass
+
 
 from twisted.application        import service
-from twisted.python.log         import *
-
-# from twisted.application import service
+from twisted.python.log import PythonLoggingObserver, textFromEventDict
 
 class Knive(service.MultiService):
     """A single service to rule them all. Singleton object for startup and stop of services."""
@@ -46,12 +54,12 @@ class Knive(service.MultiService):
         
         """List of available channels."""
 
-    def printOutlets(self,object,t=2,r=1):
+    def printOutlets(self,obj,t=2,r=1):
         if r>10:
             Exception("Maximum recursion depth")
             sys.exit(1)
-        if IKNInlet.providedBy(object):
-            for outlet in object.outlets:
+        if IKNInlet.providedBy(obj):
+            for outlet in obj.outlets:
                 print "%sOutlet: %s" % ("  "*t,outlet)
                 self.printOutlets(outlet,t+2,r=r+1)
 
@@ -84,8 +92,13 @@ class Knive(service.MultiService):
                                                 secret=configObject['source']['sharedSecret'],
                                                 port=configObject['source']['listenPort']
                                             )
+        elif configObject['source']['type'] == 'GstInlet' and gstreamerEnabled:
+            channel.inlet = GstInlet(
+                name = configObject['source']['name'],
+                pipeline = configObject['source']['pipeline']
+            )
         else:
-            print "Unknown Inlet Type %s" % knive.config['stream']['inlet']
+            print "Unknown Inlet Type %s" % self.config['source']['type']
             sys.exit(1)
 
         # ===============
@@ -110,15 +123,15 @@ class Knive(service.MultiService):
 
             elif outletConfig['type'] == 'StreamArchiver':
                 
-                archiver = files.FileWriter(
-                                                    knive.config[outletsectionname]['outputdir'],
-                                                    suffix=knive.config[outletsectionname]['suffix'],
-                                                    keepFiles=knive.config[outletsectionname]['keepfiles'],
-                                                    filename=knive.config[outletsectionname]['filename']
-                                                )
+                archiver = FileWriter(
+                        self.config[outletsectionname]['outputdir'],
+                        suffix=self.config[outletsectionname]['suffix'],
+                        keepFiles=self.config[outletsectionname]['keepfiles'],
+                        filename=self.config[outletsectionname]['filename']
+                )
                 channel.addOutlet(archiver)
             elif outletConfig['type'] == 'MEncoder':
-                mplayer = mplayer.Player(binary=knive.config[outletsectionname]['mplayerbin'])
+                mplayer = mplayer.Player(binary=self.config[outletsectionname]['mplayerbin'])
                 channel.addOutlet(mplayer)
             else:
                 self.log.error('Unknown outlet type %s' % outletsectionname)

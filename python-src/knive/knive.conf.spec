@@ -47,10 +47,12 @@ port=integer(min=1024,max=65000,default=8000)
             f=string(default=mpegts)
 
     [[[source]]]
-    type=option('kniveTCPSource', 'kniveFileSource', 'kniveIcecastSource')
+    type=option('kniveTCPSource', 'kniveFileSource', 'kniveIcecastSource', 'GstInlet')
     listenAddress=string(default='0.0.0.0')
     listenPort=integer(default=3333)
     sharedSecret=string(min=5)
+    name=string(default=None)
+    pipeline=string(default=None)
 
 
 

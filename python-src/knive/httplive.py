@@ -1,11 +1,22 @@
-# httplive.py
-# Copyright (c) 2012 Thorsten Philipp <kyrios@kyri0s.de>
+# httplive.py Copyright (c) 2012 Thorsten Philipp <kyrios@kyri0s.de>
 
-# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 
-# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
 
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 import os
 import tempfile
 import shutil
@@ -30,11 +41,15 @@ import knive
 
 class HTTPLiveStream(KNDistributor):
     """
-    A HTTPLiveStream accepts mpeg-ts streams (optionally) reencodes the data to (optionally) various qualities and cuts them in pieces.
+    A HTTPLiveStream accepts mpeg-ts streams (optionally) reencodes the data to
+    (optionally) various qualities and cuts them in pieces.
 
-    The result of this are small .ts files of several seconds duration. The HTTPLiveStream creates a playlist over the created .ts files.
-    The .ts segments and playlist are then typically stored on a webserver. Clients supporting HTTPLiveStream specification can then display
-    the stream. See http://tools.ietf.org/html/draft-pantos-http-live-streaming for a full specification.
+    The result of this are small .ts files of several seconds duration. The
+    HTTPLiveStream creates a playlist over the created .ts files. The .ts
+    segments and playlist are then typically stored on a webserver. Clients
+    supporting HTTPLiveStream specification can then display the stream. See
+    http://tools.ietf.org/html/draft-pantos-http-live-streaming for a full
+    specification.
 
     Extends :class:`KNDistributor`
     """
@@ -224,9 +239,9 @@ class HTTPLiveVariantStream(KNDistributor):
         self.destinationDirectory = None
         # Set up the encoder
         if ffmpegbin:
-            self.encoder = FFMpeg(ffmpegbin=ffmpegbin,encoderArguments=encoderArguments)
+            self.encoder = FFMpeg(name=name, ffmpegbin=ffmpegbin,encoderArguments=encoderArguments)
         else:
-            self.encoder = FFMpeg(encoderArguments=encoderArguments)
+            self.encoder = FFMpeg(name=name, encoderArguments=encoderArguments)
 
         self.segmenter = HTTPLiveSegmenter(self,name=self.name+"_segmenter",destdir=self.destinationDirectory)
 

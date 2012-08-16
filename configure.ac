@@ -42,6 +42,7 @@ AX_PYTHON_MODULE([logging],[.])
 AX_PYTHON_MODULE([twisted.conch.manhole_tap],[.])
 AX_PYTHON_MODULE([zope.interface],[.])
 AX_PYTHON_MODULE([json],[.])
+AX_PYTHON_MODULE([gobject])
 
 
 AC_OUTPUT
