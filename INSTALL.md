@@ -1,7 +1,7 @@
 Simple installation
 ===================
-./configure && make
-make install
+    ./configure && make
+    make install
 
 
 Verbose Installation
@@ -22,7 +22,7 @@ OS independent notes
 * pyasn1 (For manhole service)
 
 Hint:
-	sudo easy_install pycrypto pyasn1
+    sudo easy_install pycrypto pyasn1
 
 
 
@@ -34,8 +34,8 @@ You will need to have Xcode (or at least the commandline tools) and homebrew ins
 * Install [XQuartz](http://xquartz.macosforge.org/landing/) - Required for ffmpeg formula
 * Install FFMpeg
 
- brew install ffmpeg
+    brew install ffmpeg
 
- ./configure
- make
- sudo make install
+    ./configure
+    make
+    sudo make install
