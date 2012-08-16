@@ -1,5 +1,5 @@
 AC_PREREQ([2.69])
-AC_INIT([knive], [1.0], [knive@kyri0s.de])
+AC_INIT([knive], [0.1.0], [knive@kyri0s.de])
 m4_include([autotools_ax_python_module.m4])
 AC_CONFIG_SRCDIR([src/live_segmenter.c])
 AC_CONFIG_FILES([python-src/Makefile])
