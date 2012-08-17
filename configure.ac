@@ -13,7 +13,7 @@ AC_PROG_MAKE_SET
 AC_PATH_PROG([ffmpeg_bin_path],[ffmpeg])
 
 
-AC_CHECK_LIB([avformat], [avio_open],[],[AC_MSG_ERROR(could not find required version of libavformat >= 52.92.0)])
+AC_CHECK_LIB([avformat], [avformat_new_stream],[],[AC_MSG_ERROR(could not find required version of libavformat >= 52.92.0)])
 AC_CHECK_LIB([avcodec], [av_dup_packet],[],[AC_MSG_ERROR(could not find required version of libavcodec)])
 AC_CHECK_LIB([avutil], [av_freep],[],[AC_MSG_ERROR(could not find required version of libavutil)])
 
