@@ -13,6 +13,7 @@ from twisted.internet.interfaces    import ILoggingContext
 import logging
 import os
 import json
+
         
 class WebKnive(service.Service):
     """Web(server) backend for Knive"""
@@ -163,21 +164,22 @@ class WebAPIV1(KniveResource):
                     webChannel = WebChannel(channel)
                     self.channels[channel.slug] = webChannel
                     return webChannel
+            print '%s not found' % name
         print request.postpath
         print request.prepath
         apiVersion = request.prepath[0]
         channel = request.prepath[1]
         print 'Requesting Channel %s' % channel
-        print self.backend.channels
+        return self.backend.channels
 
-    # def setup(self):
-    #     print 'Channel List'
-    #     print self.backend.channels
-    #     for channel in self.backend.channels:
-    #         print '.....................%s' % channel
-    #     sys.exit(1)
-    #     self.putChild('channel',WebChannels(self.backend))
-    #     self.putChild('root',WebRootTree(self.backend))
+    def setup(self):
+        print 'Channel List'
+        print self.backend.channels
+        for channel in self.backend.channels:
+            print '.....................%s' % channel
+        # sys.exit(1)
+        self.putChild('channel',WebChannels(self.backend))
+        self.putChild('root',WebRootTree(self.backend))
 
 
 
@@ -189,6 +191,7 @@ class WebChannel(Resource):
         self.putChild('episodes',WebChannelEpisodes(self.channel))
 
     def render_GET(self,request):
+        request.setHeader('Content-Type', 'application/json')
         jsondata = {}
         jsondata['name'] = self.channel.name
         jsondata['slug'] = self.channel.slug
@@ -199,6 +202,7 @@ class WebChannel(Resource):
         #     episodedata['id'] = episodeid
         #     episodedata['name'] = self.channel.episodes[episodeid].name
         #     jsondata['episodes'].append(episodedata)
+        # application/json
         return jsonResponse(jsondata)
         # return jsonResponse({'episodes':self.channel.episodes, 'qualities': None})
 
@@ -233,7 +237,13 @@ class WebChannels(KniveResource):
     def setup(self):
         """docstring for setup"""
         self.isLeaf = False
-        
+        for channel in self.backend.channels:
+            webchannel = WebChannel(channel)
+            self.putChild(channel.slug,webchannel)
+
+    def getChild(self,path,request):
+        print 'Get Child called'
+
     def render_GET(self,request):
         """docstring for render_GET"""
         returnSon = {}
