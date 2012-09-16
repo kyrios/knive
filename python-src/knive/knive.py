@@ -34,9 +34,6 @@ from twisted.python.log import PythonLoggingObserver, textFromEventDict
 class Knive(service.MultiService):
     """A single service to rule them all. Singleton object for startup and stop of services."""
 
-    def timoStart(self):
-        self.channels[0].startEpisode()
-    
     def __init__(self, configFile):
         service.MultiService.__init__(self)
         self.configFile = configFile

@@ -96,7 +96,7 @@ if knive.config['manhole']['enabled']:
     manHoleService.setServiceParent(knive)
 
 if knive.config['webservice']['enabled']:
-    webservice = web.WebKnive(port=knive.config['webservice']['port'], backend=knive)
+    webservice = web.WebKnive(port=knive.config['webservice']['port'], backend=knive, resourcepath=knive.config['webservice']['resourcepath'])
     webservice.setServiceParent(knive)
 
     # webLogging = logging.StreamHandler(webservice)

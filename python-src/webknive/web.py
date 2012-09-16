@@ -1,3 +1,25 @@
+#
+# web.py
+# Copyright (c) 2012 Thorsten Philipp <kyrios@kyri0s.de>
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the "Software"), to deal in the 
+# Software without restriction, including without limitation the rights to use, copy,
+# modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, 
+# and to permit persons to whom the Software is furnished to do so, subject to the
+# following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+# PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+# HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION 
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+
 from twisted.application    import service, internet
 from twisted.python         import log
 from twisted.web            import static, server
@@ -9,12 +31,14 @@ from twisted.internet       import reactor
 from zope.interface                 import implements
 from twisted.internet.interfaces    import ILoggingContext
 
+import apiV1.root
+
 # import broadcast
 import logging
 import os
 import json
 
-        
+
 class WebKnive(service.Service):
     """Web(server) backend for Knive"""
 
@@ -27,16 +51,15 @@ class WebKnive(service.Service):
             self.resourcepath = os.path.abspath(resourcepath)
         else:
             self.resourcepath = os.path.abspath("resources")
-        
-         
-        self.root = static.File(self.resourcepath)         
-        self.root.putChild('apiV1',WebAPIV1(self.backend))
+
+        self.root = static.File(self.resourcepath)
+        self.root.putChild('apiV1', apiV1.root.Root(self.backend))
         self.root.putChild('graph', GraphNode(self.backend))
-       
+
         #self.wsFact = broadcast.BroadcastServerFactory("ws://localhost:9002")
         # root.putChild("doc", static.File("/usr/share/doc"))
         # self.cometApi = Root('http://%s:%s/' % (self.hostname,self.port))
-        
+
         self.site = internet.TCPServer(
                                             self.port, 
                                             server.Site(self.root)
@@ -144,133 +167,7 @@ class WebRootTree(KniveResource):
             
         return json.dumps(returnSon)
 
-class WebAPIV1(KniveResource):
-    """docstring for WebAPIV1"""
 
-    def setup(self):
-        self.channels = {}
-
-    def render_GET(self,request):
-        return 'APIV1'
-
-    def getChild(self,name, request):
-        try:
-            print 'Looking for %s in cache' % name
-            return(self.channels[name])
-        except KeyError:
-            print 'Searching %s in channel objects' % name
-            for channel in self.backend.channels:
-                if channel.slug == name:
-                    webChannel = WebChannel(channel)
-                    self.channels[channel.slug] = webChannel
-                    return webChannel
-            print '%s not found' % name
-        print request.postpath
-        print request.prepath
-        apiVersion = request.prepath[0]
-        channel = request.prepath[1]
-        print 'Requesting Channel %s' % channel
-        return self.backend.channels
-
-    def setup(self):
-        print 'Channel List'
-        print self.backend.channels
-        for channel in self.backend.channels:
-            print '.....................%s' % channel
-        # sys.exit(1)
-        self.putChild('channel',WebChannels(self.backend))
-        self.putChild('root',WebRootTree(self.backend))
-
-
-
-class WebChannel(Resource):
-    """A API representation of a Knive.Channel object"""
-    def __init__(self, channel):
-        Resource.__init__(self)
-        self.channel = channel
-        self.putChild('episodes',WebChannelEpisodes(self.channel))
-
-    def render_GET(self,request):
-        request.setHeader('Content-Type', 'application/json')
-        jsondata = {}
-        jsondata['name'] = self.channel.name
-        jsondata['slug'] = self.channel.slug
-        jsondata['url'] = self.channel.url
-        # jsondata['episodes'] = []
-        # for episodeid in self.channel.episodes.keys():
-        #     episodedata = {}
-        #     episodedata['id'] = episodeid
-        #     episodedata['name'] = self.channel.episodes[episodeid].name
-        #     jsondata['episodes'].append(episodedata)
-        # application/json
-        return jsonResponse(jsondata)
-        # return jsonResponse({'episodes':self.channel.episodes, 'qualities': None})
-
-    def render_POST(self,request):
-        # self.channel.
-        return jsonResponse({'id':1})
-
-class WebChannelEpisodes(Resource):
-    """docstring for WebChannelEpisodes"""
-    def __init__(self, channel):
-        Resource.__init__(self)
-        self.channel = channel
-
-    def render_GET(self,request):
-        jsondata = []
-        for episodeid in self.channel.episodes.keys():
-            episodedata = {}
-            episodedata['id'] = episodeid
-            episodedata['name'] = self.channel.episodes[episodeid].name
-            episodedata['starttime'] = self.channel.episodes[episodeid].starttime
-            episodedata['endtime'] = self.channel.episodes[episodeid].endtime
-            jsondata.append(episodedata)
-        return jsonResponse(jsondata)
-        
-
-                       
-        
-        
-class WebChannels(KniveResource):
-    """docstring for WebChannels"""
-    
-    def setup(self):
-        """docstring for setup"""
-        self.isLeaf = False
-        for channel in self.backend.channels:
-            webchannel = WebChannel(channel)
-            self.putChild(channel.slug,webchannel)
-
-    def getChild(self,path,request):
-        print 'Get Child called'
-
-    def render_GET(self,request):
-        """docstring for render_GET"""
-        returnSon = {}
-        returnSon['success'] = True
-        returnSon['channels'] = []
-        for stream in self.backend.channels:
-                stre = {}
-                stre['id'] = 1
-                stre['name'] = stream.name
-                stre['slug'] = stream.slug
-                stre['url'] = stream.url
-                stre['episodes'] = []
-                for episode in stream.episodes:
-                    episo = {}
-                    episo['index'] = episode.index
-                    episo['title'] = episode.title
-                    episo['startdate'] = episode.startdate
-                    episo['enddate'] = episode.enddate
-                    stre['episodes'].append(episo)
-                    
-                returnSon['channels'].append(stre)
-        stre0 = {}
-        stre0['id'] = 2
-        stre0['name'] = 'Test0'
-        stre0['slug'] = 'tes0'
-        returnSon['channels'].append(stre0)
-        return json.dumps(returnSon,indent=4)
                     
         
     
