@@ -1,11 +1,74 @@
-<html>
-<head>
-    <title>Hello Ext</title>
- 
-    <link rel="stylesheet" type="text/css" href="extjs/resources/css/ext-all-gray.css">
-    <link rel="stylesheet" type="text/css" href="knive.css">
-    <script type="text/javascript" src="extjs/ext-debug.js"></script>
-    <script type="text/javascript" src="knive.js"></script>
-</head>
-<body></body>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Knive Admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <!-- Le styles -->
+    <link rel="stylesheet" href="lib/bootstrap/css/bootstrap.css">
+    <link rel="stylesheet" href="lib/datatables/css/jquery.dataTables.css">
+    <style type="text/css">
+      body {
+        padding-top: 60px;
+        padding-bottom: 40px;
+      }
+      .sidebar-nav {
+        padding: 9px 0;
+      }
+    </style>
+    <link rel="stylesheet" href="lib/bootstrap/css/bootstrap-responsive.css">
+
+    <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <!-- Le fav and touch icons -->
+    <link rel="shortcut icon" href="../assets/ico/favicon.ico">
+    <link rel="apple-touch-icon-precomposed" sizes="144x144" href="../assets/ico/apple-touch-icon-144-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" sizes="114x114" href="../assets/ico/apple-touch-icon-114-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" sizes="72x72" href="../assets/ico/apple-touch-icon-72-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" href="../assets/ico/apple-touch-icon-57-precomposed.png">
+  </head>
+
+  <body>
+    <div class="navbar navbar-inverse navbar-fixed-top" id='topnav'>
+    </div>
+    <div class="container-fluid">
+    <div class="row-fluid">
+      <div class="span2" id="sidenav">
+      </div><!--/span-->
+      <div class="span10" id='content'>
+      </div><!--/span-->
+    </div><!--/row-->
+
+    <hr>
+
+    <footer>
+      <p>&copy; Company 2012</p>
+    </footer>
+
+</div><!--/.fluid-container-->
+    
+  	<script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.0/jquery.min.js"></script>
+    <script src="lib/underscore-min.js"></script>
+    <script src="lib/backbone.js"></script>
+    <script src="lib/backbone-relational.js"></script>
+  	<script src="lib/bootstrap/js/bootstrap.min.js"></script>
+  	<script src="lib/datatables/js/jquery.dataTables.js"></script>
+  	<script src="lib/jquery.rest.js"></script>
+
+    <script src="js/utils.js"></script>
+    <script src="js/views/topnav.js"></script>
+    <script src="js/views/sidenav.js"></script>
+    <script src="js/views/channellist.js"></script>
+    <script src="js/views/settingslist.js"></script>
+    <script src="js/views/channellistitem.js"></script>
+    <script src="js/models/channels.js"></script>
+    <script src="js/models/settings.js"></script>
+  	<script src="js/main.js"></script>
+  </body>
 </html>
